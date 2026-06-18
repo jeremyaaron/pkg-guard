@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -74,9 +74,11 @@ describe("runCli", () => {
   it("runs init-release as a command shell", async () => {
     const fixture = await createPackageFixture();
     const result = await invoke(["init-release"], fixture);
+    const workflow = await readFile(join(fixture, ".github", "workflows", "release.yml"), "utf8");
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toBe("pkg-guard found no issues\n");
+    expect(result.stdout).toContain("Created .github/workflows/release.yml");
+    expect(workflow).toContain("npm publish");
   });
 
   it("returns discovery errors for missing package.json", async () => {

@@ -3,6 +3,7 @@ import { runChecks } from "../core/checks.js";
 import { applyFixPlans, planFixes, renderFixPlanHuman, renderFixPlanJson } from "../core/fixes.js";
 import { createReport, getExitCode, type Finding } from "../core/findings.js";
 import { applyFindingPolicy } from "../core/policy.js";
+import { initReleaseWorkflow, renderInitReleaseHuman, renderInitReleaseJson } from "../core/release.js";
 import { renderHumanReport } from "../reporters/human.js";
 import { renderJsonReport } from "../reporters/json.js";
 import { getCommandHelpText, getHelpText } from "./help.js";
@@ -46,12 +47,32 @@ async function runCommand(options: ParsedOptions, io: CliIO): Promise<number> {
     return await runFixCommand(options, io);
   }
 
+  if (options.command === "init-release") {
+    return await runInitReleaseCommand(options, io);
+  }
+
   const findings = await getCommandFindings(options);
   const report = createReport(options.command, options.cwd, findings);
   const output = options.json ? renderJsonReport(report) : renderHumanReport(report);
 
   io.stdout.write(output);
   return getExitCode(findings);
+}
+
+async function runInitReleaseCommand(options: ParsedOptions, io: CliIO): Promise<number> {
+  const discovery = await discoverProject(options.cwd);
+
+  if (!discovery.context) {
+    const report = createReport(options.command, options.cwd, discovery.findings);
+    io.stdout.write(options.json ? renderJsonReport(report) : renderHumanReport(report));
+    return getExitCode(discovery.findings);
+  }
+
+  const result = await initReleaseWorkflow(discovery.context);
+
+  io.stdout.write(options.json ? renderInitReleaseJson(result) : renderInitReleaseHuman(result));
+
+  return result.created ? 0 : 1;
 }
 
 async function runFixCommand(options: ParsedOptions, io: CliIO): Promise<number> {

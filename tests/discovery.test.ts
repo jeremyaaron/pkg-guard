@@ -65,7 +65,7 @@ describe("discoverProject", () => {
     expect(result.findings).toEqual([]);
   });
 
-  it("reports package manager conflicts", async () => {
+  it("exposes package manager conflict data in context", async () => {
     const root = await createFixture({
       packageJson: {
         name: "conflict-fixture",
@@ -79,7 +79,8 @@ describe("discoverProject", () => {
 
     const result = await discoverProject(root);
 
-    expect(result.findings.map((finding) => finding.id)).toContain("project.package-manager-conflict");
+    expect(result.context?.packageManager.packageManagerField?.name).toBe("pnpm");
+    expect(result.context?.packageManager.lockfiles[0]?.name).toBe("npm");
   });
 
   it("reports multiple lockfiles", async () => {

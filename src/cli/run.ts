@@ -1,5 +1,7 @@
 import { discoverProject } from "../core/discovery.js";
+import { runChecks } from "../core/checks.js";
 import { createReport, getExitCode, type Finding } from "../core/findings.js";
+import { applyFindingPolicy } from "../core/policy.js";
 import { renderHumanReport } from "../reporters/human.js";
 import { renderJsonReport } from "../reporters/json.js";
 import { getCommandHelpText, getHelpText } from "./help.js";
@@ -49,5 +51,13 @@ async function runCommand(options: ParsedOptions, io: CliIO): Promise<number> {
 
 async function getCommandFindings(options: ParsedOptions): Promise<Finding[]> {
   const discovery = await discoverProject(options.cwd);
-  return discovery.findings;
+
+  if (!discovery.context) {
+    return discovery.findings;
+  }
+
+  return applyFindingPolicy([...discovery.findings, ...runChecks(discovery.context)], discovery.context.config, {
+    ignore: options.ignore,
+    strict: options.strict
+  });
 }

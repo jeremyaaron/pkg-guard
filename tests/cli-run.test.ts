@@ -117,7 +117,17 @@ async function createPackageFixture(): Promise<string> {
 
   await writeFile(
     join(root, "package.json"),
-    `${JSON.stringify({ name: "fixture", version: "1.0.0", packageManager: "npm@10.8.2" }, null, 2)}\n`
+    `${JSON.stringify(
+      {
+        name: "fixture",
+        version: "1.0.0",
+        license: "MIT",
+        packageManager: "npm@10.8.2",
+        files: ["dist"]
+      },
+      null,
+      2
+    )}\n`
   );
   await writeFile(join(root, "package-lock.json"), "{}\n");
 

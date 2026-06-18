@@ -4,6 +4,7 @@ import { access, readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
+import { loadPkgGuardConfig } from "./config.js";
 import type { Finding } from "./findings.js";
 import type {
   GitInfo,
@@ -75,7 +76,8 @@ export async function discoverProject(cwdInput: string): Promise<ProjectDiscover
   const lockfiles = await discoverLockfiles(root);
   const packageManagerField = parsePackageManagerField(manifest.data.packageManager);
   const packageManager = detectPackageManager(packageManagerField, lockfiles);
-  const findings = getDiscoveryFindings(packageManagerField, lockfiles);
+  const config = loadPkgGuardConfig(manifest.data.pkgGuard);
+  const findings = [...getDiscoveryFindings(packageManagerField, lockfiles), ...config.findings];
 
   return {
     context: {
@@ -85,7 +87,8 @@ export async function discoverProject(cwdInput: string): Promise<ProjectDiscover
       packageManager,
       git: await readGitInfo(root),
       tsconfig: await readTsconfig(root),
-      workflows: await readWorkflows(root)
+      workflows: await readWorkflows(root),
+      config: config.config
     },
     findings
   };
@@ -190,17 +193,6 @@ function getDiscoveryFindings(
       severity: "warning",
       title: "Unknown package manager",
       message: `package.json declares packageManager as ${packageManagerField.raw}, which pkg-guard does not recognize yet.`,
-      file: "package.json",
-      path: "$.packageManager"
-    });
-  }
-
-  if (knownFieldName && lockfileNames.size > 0 && !lockfileNames.has(knownFieldName)) {
-    findings.push({
-      id: "project.package-manager-conflict",
-      severity: "warning",
-      title: "Package manager conflicts with lockfile",
-      message: `package.json declares ${packageManagerField?.raw}, but the lockfile belongs to ${formatList([...lockfileNames])}.`,
       file: "package.json",
       path: "$.packageManager"
     });

@@ -5,6 +5,8 @@ export interface ParsedOptions {
   json: boolean;
   dryRun: boolean;
   cwd: string;
+  ignore: string[];
+  strict: boolean;
 }
 
 export type ParseResult =
@@ -32,7 +34,9 @@ export function parseArgs(args: string[], cwd: string): ParseResult {
     command: command as CommandName,
     json: false,
     dryRun: false,
-    cwd
+    cwd,
+    ignore: [],
+    strict: false
   };
 
   for (let index = 0; index < rest.length; index += 1) {
@@ -42,6 +46,21 @@ export function parseArgs(args: string[], cwd: string): ParseResult {
       options.json = true;
     } else if (arg === "--dry-run") {
       options.dryRun = true;
+    } else if (arg === "--strict") {
+      options.strict = true;
+    } else if (arg === "--ignore") {
+      const value = rest[index + 1];
+
+      if (!value) {
+        return {
+          ok: false,
+          help: command,
+          message: "--ignore requires a check ID"
+        };
+      }
+
+      options.ignore.push(...value.split(",").map((item) => item.trim()).filter(Boolean));
+      index += 1;
     } else if (arg === "--cwd") {
       const value = rest[index + 1];
 

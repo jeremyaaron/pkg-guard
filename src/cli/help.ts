@@ -13,6 +13,8 @@ Commands:
 
 Options:
   --json         Print machine-readable JSON.
+  --strict       Upgrade configured strict warnings to errors.
+  --ignore <id>  Ignore a check ID for this run.
   --cwd <path>   Run against a different project directory.
   -h, --help     Show help.
 `;
@@ -25,7 +27,7 @@ export function getCommandHelpText(command: string): string {
 Audit the current package.
 
 Usage:
-  pkg-guard check [--json] [--cwd <path>]
+  pkg-guard check [--json] [--strict] [--ignore <id>] [--cwd <path>]
 `;
   }
 
@@ -35,7 +37,7 @@ Usage:
 Apply conservative automatic fixes.
 
 Usage:
-  pkg-guard fix [--dry-run] [--json] [--cwd <path>]
+  pkg-guard fix [--dry-run] [--json] [--strict] [--ignore <id>] [--cwd <path>]
 `;
   }
 
@@ -45,7 +47,7 @@ Usage:
 Create a GitHub Actions npm release workflow.
 
 Usage:
-  pkg-guard init-release [--json] [--cwd <path>]
+  pkg-guard init-release [--json] [--strict] [--ignore <id>] [--cwd <path>]
 `;
   }
 

@@ -1,5 +1,6 @@
 import type { ProjectContext } from "./context.js";
 import type { Finding } from "./findings.js";
+import { entrypointChecks } from "../checks/entrypoints.js";
 import { manifestChecks } from "../checks/manifest.js";
 
 export interface Check {
@@ -7,7 +8,7 @@ export interface Check {
   run(context: ProjectContext): Finding[];
 }
 
-const checks: Check[] = [...manifestChecks];
+const checks: Check[] = [...manifestChecks, ...entrypointChecks];
 
 export function runChecks(context: ProjectContext): Finding[] {
   return checks.flatMap((check) => check.run(context));

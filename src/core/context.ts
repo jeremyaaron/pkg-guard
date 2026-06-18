@@ -32,6 +32,11 @@ export interface PackageManifest {
   exports?: unknown;
   bin?: unknown;
   files?: unknown;
+  dependencies?: unknown;
+  devDependencies?: unknown;
+  peerDependencies?: unknown;
+  optionalDependencies?: unknown;
+  peerDependenciesMeta?: unknown;
   pkgGuard?: unknown;
   [key: string]: unknown;
 }

@@ -6,6 +6,7 @@ export interface ProjectContext {
   git: GitInfo | null;
   tsconfig: TsconfigInfo | null;
   workflows: WorkflowInfo[];
+  pack: PackInfo | null;
   config: PkgGuardConfig;
 }
 
@@ -73,4 +74,17 @@ export interface TsconfigInfo {
 export interface WorkflowInfo {
   path: string;
   raw: string;
+}
+
+export interface PackInfo {
+  files: PackFile[];
+  entryCount: number;
+  unpackedSize: number;
+  raw: unknown;
+}
+
+export interface PackFile {
+  path: string;
+  size: number;
+  mode: number;
 }

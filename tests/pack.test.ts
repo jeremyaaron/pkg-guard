@@ -8,89 +8,70 @@ import { describe, expect, it } from "vitest";
 import { runChecks } from "../src/core/checks.js";
 import { discoverProject } from "../src/core/discovery.js";
 
-describe("entrypoint checks", () => {
-  it.each([
-    ["main", { main: "./dist/missing.js" }],
-    ["types", { types: "./dist/missing.d.ts" }],
-    ["exports", { exports: "./dist/missing.js" }],
-    ["bin", { bin: { fixture: "./dist/missing.js" } }]
-  ])("reports missing %s targets", async (_name, entryFields) => {
-    const root = await createFixture({
-      packageJson: basePackage(entryFields)
-    });
-
-    const findings = await getCheckFindings(root);
-
-    expect(findings.map((finding) => finding.id)).toContain("entrypoint.target-missing");
-  });
-
-  it("reports targets that escape the package root", async () => {
+describe("pack checks", () => {
+  it("reports sensitive files included in npm pack output", async () => {
     const root = await createFixture({
       packageJson: basePackage({
-        main: "../outside.js",
-        exports: {
-          ".": "../outside.js"
-        }
-      })
-    });
-
-    const findings = await getCheckFindings(root);
-
-    expect(findings.filter((finding) => finding.id === "entrypoint.target-escapes-package")).toHaveLength(2);
-  });
-
-  it("reports bin targets without a shebang", async () => {
-    const root = await createFixture({
-      packageJson: basePackage({
-        bin: {
-          fixture: "./dist/cli.js"
-        }
+        files: ["dist", ".env"]
       }),
       files: {
-        "dist/cli.js": "console.log('hello');\n"
+        "dist/index.js": "export {};\n",
+        ".env": "SECRET=value\n",
+        "README.md": "# Fixture\n",
+        "LICENSE": "MIT\n"
       }
     });
 
     const findings = await getCheckFindings(root);
 
-    expect(findings.map((finding) => finding.id)).toContain("entrypoint.bin-shebang-missing");
+    expect(findings.map((finding) => finding.id)).toContain("pack.sensitive-file-included");
   });
 
-  it("warns on unsupported export shapes without crashing", async () => {
+  it("warns when README and license files are missing from npm pack output", async () => {
     const root = await createFixture({
       packageJson: basePackage({
-        exports: {
-          ".": ["./dist/index.js"],
-          "./feature/*": "./dist/feature/*.js"
-        }
-      })
+        files: ["dist"]
+      }),
+      files: {
+        "dist/index.js": "export {};\n"
+      }
+    });
+
+    const findings = await getCheckFindings(root);
+    const ids = findings.map((finding) => finding.id);
+
+    expect(ids).toContain("pack.readme-missing");
+    expect(ids).toContain("pack.license-file-missing");
+  });
+
+  it("reports declared entrypoints missing from npm pack output", async () => {
+    const root = await createFixture({
+      packageJson: basePackage({
+        main: "./dist/index.js",
+        files: ["README.md", "LICENSE"]
+      }),
+      files: {
+        "dist/index.js": "export {};\n",
+        "README.md": "# Fixture\n",
+        "LICENSE": "MIT\n"
+      }
     });
 
     const findings = await getCheckFindings(root);
 
-    expect(findings.filter((finding) => finding.id === "entrypoint.unsupported-target")).toHaveLength(2);
+    expect(findings.map((finding) => finding.id)).toContain("pack.entrypoint-missing");
   });
 
-  it("passes a valid simple ESM TypeScript library fixture", async () => {
+  it("passes when declared entrypoints and required docs are packed", async () => {
     const root = await createFixture({
       packageJson: basePackage({
-        type: "module",
         main: "./dist/index.js",
         types: "./dist/index.d.ts",
-        exports: {
-          ".": {
-            types: "./dist/index.d.ts",
-            import: "./dist/index.js"
-          }
-        },
-        bin: {
-          fixture: "./dist/cli.js"
-        }
+        files: ["dist", "README.md", "LICENSE"]
       }),
       files: {
-        "dist/index.js": "export const value = 1;\n",
-        "dist/index.d.ts": "export declare const value: number;\n",
-        "dist/cli.js": "#!/usr/bin/env node\nconsole.log('hello');\n",
+        "dist/index.js": "export {};\n",
+        "dist/index.d.ts": "export {};\n",
         "README.md": "# Fixture\n",
         "LICENSE": "MIT\n"
       }
@@ -104,11 +85,10 @@ describe("entrypoint checks", () => {
 
 function basePackage(overrides: Record<string, unknown>): Record<string, unknown> {
   return {
-    name: "entrypoint-fixture",
+    name: "pack-fixture",
     version: "1.0.0",
     license: "MIT",
     packageManager: "npm@10.8.2",
-    files: ["dist"],
     ...overrides
   };
 }
@@ -127,7 +107,7 @@ async function createFixture(options: {
   packageJson: Record<string, unknown>;
   files?: Record<string, string>;
 }): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "pkg-guard-entrypoints-"));
+  const root = await mkdtemp(join(tmpdir(), "pkg-guard-pack-"));
 
   await writeFile(join(root, "package.json"), `${JSON.stringify(options.packageJson, null, 2)}\n`);
 

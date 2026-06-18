@@ -145,6 +145,8 @@ async function createPackageFixture(): Promise<string> {
     )}\n`
   );
   await writeFile(join(root, "package-lock.json"), "{}\n");
+  await writeFile(join(root, "README.md"), "# Fixture\n");
+  await writeFile(join(root, "LICENSE"), "MIT\n");
 
   return root;
 }

@@ -12,6 +12,7 @@ import type {
   PackageManagerField,
   PackageManagerInfo,
   PackageManagerName,
+  PackInfo,
   ProjectContext,
   TsconfigInfo,
   WorkflowInfo
@@ -77,7 +78,12 @@ export async function discoverProject(cwdInput: string): Promise<ProjectDiscover
   const packageManagerField = parsePackageManagerField(manifest.data.packageManager);
   const packageManager = detectPackageManager(packageManagerField, lockfiles);
   const config = loadPkgGuardConfig(manifest.data.pkgGuard);
-  const findings = [...getDiscoveryFindings(packageManagerField, lockfiles), ...config.findings];
+  const pack = await readPackInfo(root);
+  const findings = [
+    ...getDiscoveryFindings(packageManagerField, lockfiles),
+    ...config.findings,
+    ...(pack.finding ? [pack.finding] : [])
+  ];
 
   return {
     context: {
@@ -88,6 +94,7 @@ export async function discoverProject(cwdInput: string): Promise<ProjectDiscover
       git: await readGitInfo(root),
       tsconfig: await readTsconfig(root),
       workflows: await readWorkflows(root),
+      pack: pack.info,
       config: config.config
     },
     findings
@@ -268,6 +275,49 @@ async function readWorkflows(root: string): Promise<WorkflowInfo[]> {
   );
 }
 
+async function readPackInfo(root: string): Promise<{ info: PackInfo | null; finding?: Finding }> {
+  try {
+    const { stdout } = await execFileAsync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], {
+      cwd: root
+    });
+    const parsed = JSON.parse(stdout) as unknown;
+    const first = Array.isArray(parsed) ? parsed[0] : null;
+
+    if (!isRecord(first) || !Array.isArray(first.files)) {
+      return {
+        info: null,
+        finding: packInspectFailedFinding("npm pack returned an unexpected JSON shape.")
+      };
+    }
+
+    return {
+      info: {
+        files: first.files.filter(isPackFile),
+        entryCount: typeof first.entryCount === "number" ? first.entryCount : first.files.length,
+        unpackedSize: typeof first.unpackedSize === "number" ? first.unpackedSize : 0,
+        raw: first
+      }
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "npm pack could not inspect this package.";
+
+    return {
+      info: null,
+      finding: packInspectFailedFinding(message)
+    };
+  }
+}
+
+function packInspectFailedFinding(message: string): Finding {
+  return {
+    id: "pack.inspect-failed",
+    severity: "warning",
+    title: "Package contents could not be inspected",
+    message,
+    suggestion: "Run the package build if needed, then run pkg-guard check again."
+  };
+}
+
 async function isReadableFile(filePath: string): Promise<boolean> {
   try {
     const fileStat = await stat(filePath);
@@ -290,4 +340,17 @@ async function isReadableDirectory(filePath: string): Promise<boolean> {
 
 function formatList(values: string[]): string {
   return values.sort().join(", ");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isPackFile(value: unknown): value is { path: string; size: number; mode: number } {
+  return (
+    isRecord(value) &&
+    typeof value.path === "string" &&
+    typeof value.size === "number" &&
+    typeof value.mode === "number"
+  );
 }

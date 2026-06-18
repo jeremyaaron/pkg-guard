@@ -1,3 +1,4 @@
+import { discoverProject } from "../core/discovery.js";
 import { createReport, getExitCode, type Finding } from "../core/findings.js";
 import { renderHumanReport } from "../reporters/human.js";
 import { renderJsonReport } from "../reporters/json.js";
@@ -29,7 +30,7 @@ export async function runCli(args: string[], io: CliIO): Promise<number> {
       return parsed.message ? 2 : 0;
     }
 
-    return runCommand(parsed.options, io);
+    return await runCommand(parsed.options, io);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected internal failure";
     io.stderr.write(`pkg-guard failed: ${message}\n`);
@@ -37,8 +38,8 @@ export async function runCli(args: string[], io: CliIO): Promise<number> {
   }
 }
 
-function runCommand(options: ParsedOptions, io: CliIO): number {
-  const findings = getCommandFindings();
+async function runCommand(options: ParsedOptions, io: CliIO): Promise<number> {
+  const findings = await getCommandFindings(options);
   const report = createReport(options.command, options.cwd, findings);
   const output = options.json ? renderJsonReport(report) : renderHumanReport(report);
 
@@ -46,6 +47,7 @@ function runCommand(options: ParsedOptions, io: CliIO): number {
   return getExitCode(findings);
 }
 
-function getCommandFindings(): Finding[] {
-  return [];
+async function getCommandFindings(options: ParsedOptions): Promise<Finding[]> {
+  const discovery = await discoverProject(options.cwd);
+  return discovery.findings;
 }

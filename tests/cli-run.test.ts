@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 import { runCli, type CliIO } from "../src/cli/run.js";
 
@@ -20,7 +23,8 @@ describe("runCli", () => {
   });
 
   it("runs check with an empty finding set", async () => {
-    const result = await invoke(["check"]);
+    const fixture = await createPackageFixture();
+    const result = await invoke(["check"], fixture);
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("pkg-guard found no issues\n");
@@ -28,7 +32,8 @@ describe("runCli", () => {
   });
 
   it("prints check JSON with schema metadata", async () => {
-    const result = await invoke(["check", "--json"]);
+    const fixture = await createPackageFixture();
+    const result = await invoke(["check", "--json"], fixture);
     const report = JSON.parse(result.stdout) as {
       schemaVersion: number;
       command: string;
@@ -44,17 +49,32 @@ describe("runCli", () => {
   });
 
   it("runs fix as a command shell", async () => {
-    const result = await invoke(["fix", "--dry-run"]);
+    const fixture = await createPackageFixture();
+    const result = await invoke(["fix", "--dry-run"], fixture);
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("pkg-guard found no issues\n");
   });
 
   it("runs init-release as a command shell", async () => {
-    const result = await invoke(["init-release"]);
+    const fixture = await createPackageFixture();
+    const result = await invoke(["init-release"], fixture);
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("pkg-guard found no issues\n");
+  });
+
+  it("returns discovery errors for missing package.json", async () => {
+    const fixture = await mkdtemp(join(tmpdir(), "pkg-guard-empty-"));
+    const result = await invoke(["check", "--json"], fixture);
+    const report = JSON.parse(result.stdout) as {
+      summary: { errors: number };
+      findings: Array<{ id: string }>;
+    };
+
+    expect(result.exitCode).toBe(1);
+    expect(report.summary.errors).toBe(1);
+    expect(report.findings[0]?.id).toBe("project.package-json-missing");
   });
 
   it("rejects unsupported command options", async () => {
@@ -65,7 +85,7 @@ describe("runCli", () => {
   });
 });
 
-async function invoke(args: string[]): Promise<{
+async function invoke(args: string[], cwd = "/repo"): Promise<{
   exitCode: number;
   stdout: string;
   stderr: string;
@@ -74,7 +94,7 @@ async function invoke(args: string[]): Promise<{
   let stderr = "";
 
   const io: CliIO = {
-    cwd: "/repo",
+    cwd,
     stdout: {
       write(value) {
         stdout += value;
@@ -90,4 +110,16 @@ async function invoke(args: string[]): Promise<{
   const exitCode = await runCli(args, io);
 
   return { exitCode, stdout, stderr };
+}
+
+async function createPackageFixture(): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), "pkg-guard-package-"));
+
+  await writeFile(
+    join(root, "package.json"),
+    `${JSON.stringify({ name: "fixture", version: "1.0.0", packageManager: "npm@10.8.2" }, null, 2)}\n`
+  );
+  await writeFile(join(root, "package-lock.json"), "{}\n");
+
+  return root;
 }

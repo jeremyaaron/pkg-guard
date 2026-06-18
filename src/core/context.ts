@@ -22,6 +22,10 @@ export interface PackageManifest {
   private?: unknown;
   license?: unknown;
   repository?: unknown;
+  bugs?: unknown;
+  homepage?: unknown;
+  types?: unknown;
+  typings?: unknown;
   files?: unknown;
   pkgGuard?: unknown;
   [key: string]: unknown;

@@ -53,7 +53,22 @@ describe("runCli", () => {
     const result = await invoke(["fix", "--dry-run"], fixture);
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toBe("pkg-guard found no issues\n");
+    expect(result.stdout).toBe("pkg-guard found no fixable issues\n");
+  });
+
+  it("prints fix JSON for an empty fix set", async () => {
+    const fixture = await createPackageFixture();
+    const result = await invoke(["fix", "--json"], fixture);
+    const report = JSON.parse(result.stdout) as {
+      command: string;
+      dryRun: boolean;
+      summary: { fixes: number; changedFiles: number };
+    };
+
+    expect(result.exitCode).toBe(0);
+    expect(report.command).toBe("fix");
+    expect(report.dryRun).toBe(false);
+    expect(report.summary).toEqual({ fixes: 0, changedFiles: 0 });
   });
 
   it("runs init-release as a command shell", async () => {

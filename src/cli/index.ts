@@ -1,14 +1,9 @@
 #!/usr/bin/env node
 
-import { getHelpText } from "./help.js";
+import { runCli } from "./run.js";
 
-const args = process.argv.slice(2);
-
-if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
-  process.stdout.write(getHelpText());
-  process.exitCode = 0;
-} else {
-  process.stderr.write(`Unknown argument: ${args[0]}\n\n`);
-  process.stderr.write(getHelpText());
-  process.exitCode = 2;
-}
+process.exitCode = await runCli(process.argv.slice(2), {
+  cwd: process.cwd(),
+  stdout: process.stdout,
+  stderr: process.stderr
+});

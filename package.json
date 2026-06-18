@@ -42,6 +42,7 @@
   },
   "dependencies": {
     "semver": "^7.8.4",
-    "spdx-expression-parse": "^4.0.0"
+    "spdx-expression-parse": "^4.0.0",
+    "yaml": "^2.9.0"
   }
 }

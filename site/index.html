@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta
+      name="description"
+      content="pkg-guard is a TypeScript CLI that checks npm package manifests, entrypoints, tarballs, and release workflows before publishing."
+    >
+    <title>pkg-guard | npm package publishing hygiene</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="topbar" aria-label="Site header">
+      <a class="brand" href="#top" aria-label="pkg-guard home">
+        <span class="brand-mark" aria-hidden="true">pg</span>
+        <span>pkg-guard</span>
+      </a>
+      <nav class="nav" aria-label="Primary navigation">
+        <a href="#checks">Checks</a>
+        <a href="#workflow">Release</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/jeremyaaron/pkg-guard">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero" aria-labelledby="hero-title">
+        <img class="hero-visual" src="assets/pkg-guard-terminal.svg" alt="" aria-hidden="true">
+        <div class="hero-content">
+          <p class="eyebrow">npm package publishing hygiene</p>
+          <h1 id="hero-title">pkg-guard</h1>
+          <p class="hero-copy">
+            <span>Find broken entrypoints.</span>
+            <span>Catch bad tarballs.</span>
+            <span>Block unsafe npm release workflows.</span>
+          </p>
+          <div class="hero-actions" aria-label="Primary actions">
+            <a class="button button-primary" href="#install">Install</a>
+            <a class="button button-secondary" href="https://github.com/jeremyaaron/pkg-guard">View source</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="signal-band" aria-label="Summary">
+        <div class="signal">
+          <span class="signal-value">0</span>
+          <span class="signal-label">runtime services</span>
+        </div>
+        <div class="signal">
+          <span class="signal-value">1</span>
+          <span class="signal-label">CLI command in CI</span>
+        </div>
+        <div class="signal">
+          <span class="signal-value">6</span>
+          <span class="signal-label">publish surfaces checked</span>
+        </div>
+      </section>
+
+      <section class="section" id="checks" aria-labelledby="checks-title">
+        <div class="section-heading">
+          <p class="eyebrow">Checks</p>
+          <h2 id="checks-title">A practical preflight for package releases.</h2>
+          <p>
+            `pkg-guard check` inspects the files and metadata that consumers actually rely on: the manifest, declared entrypoints, packed tarball contents, TypeScript declarations, dependency ranges, and npm publish workflows.
+          </p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature">
+            <span class="feature-kicker">Manifest</span>
+            <h3>Package metadata that resolves cleanly.</h3>
+            <p>Validate names, versions, licenses, repository links, package managers, and publish-oriented fields.</p>
+          </article>
+          <article class="feature">
+            <span class="feature-kicker">Entrypoints</span>
+            <h3>Imports and binaries that exist.</h3>
+            <p>Check `main`, `types`, `exports`, and `bin` targets before a consumer finds the broken path.</p>
+          </article>
+          <article class="feature">
+            <span class="feature-kicker">Packlist</span>
+            <h3>The tarball, not the wishful version.</h3>
+            <p>Use npm pack inspection to detect missing files, junk artifacts, and sensitive files in publish output.</p>
+          </article>
+          <article class="feature">
+            <span class="feature-kicker">Release</span>
+            <h3>Workflow defaults that favor OIDC.</h3>
+            <p>Warn on long-lived npm tokens, missing `id-token: write`, unsafe triggers, and missing validation steps.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section contrast" id="workflow" aria-labelledby="workflow-title">
+        <div class="workflow-layout">
+          <div>
+            <p class="eyebrow">Workflow</p>
+            <h2 id="workflow-title">Built for the moment before publish.</h2>
+            <p>
+              Keep `pkg-guard` close to the release path: run it locally while developing, then run it again in CI after the package build and before `npm publish`.
+            </p>
+          </div>
+          <div class="command-panel" aria-label="Example command output">
+            <div class="command-line">$ npx pkg-guard check</div>
+            <ol class="check-list">
+              <li><span class="ok"></span> manifest metadata</li>
+              <li><span class="ok"></span> entrypoint targets</li>
+              <li><span class="ok"></span> packed package contents</li>
+              <li><span class="ok"></span> declaration settings</li>
+              <li><span class="ok"></span> release workflow posture</li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <section class="section install" id="install" aria-labelledby="install-title">
+        <div>
+          <p class="eyebrow">Install</p>
+          <h2 id="install-title">One dev dependency, one CI gate.</h2>
+        </div>
+        <div class="install-grid">
+          <pre><code>npm install -D pkg-guard
+npx pkg-guard check</code></pre>
+          <pre><code>npx pkg-guard fix --dry-run
+npx pkg-guard init-release</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>MIT licensed.</span>
+      <a href="https://github.com/jeremyaaron/pkg-guard">GitHub</a>
+      <a href="https://www.npmjs.com/package/pkg-guard">npm</a>
+    </footer>
+  </body>
+</html>

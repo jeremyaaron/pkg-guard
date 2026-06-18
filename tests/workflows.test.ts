@@ -37,6 +37,35 @@ jobs:
 
     expect(ids).toContain("workflow.long-lived-npm-token");
     expect(ids).toContain("workflow.id-token-permission-missing");
+    expect(ids).not.toContain("workflow.package-validation-missing");
+  });
+
+  it("recognizes npm pack dry-run as package validation", async () => {
+    const root = await createFixture({
+      workflow: `
+name: Release
+on:
+  push:
+    tags:
+      - "v*"
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npm pack --dry-run --ignore-scripts
+      - run: npm publish
+`
+    });
+
+    const ids = (await getCheckFindings(root)).map((finding) => finding.id);
+
+    expect(ids).not.toContain("workflow.package-validation-missing");
   });
 
   it("reports branch push publishing", async () => {

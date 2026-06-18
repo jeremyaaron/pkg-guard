@@ -292,7 +292,7 @@ function hasBuildStep(commands: string[]): boolean {
 function hasPackageValidationStep(commands: string[]): boolean {
   return commands.some((command) => {
     const normalized = normalizeCommand(command);
-    return /\bpkg-guard\s+check\b/.test(normalized) || /\bnpm\s+pack\b.*\b--dry-run\b/.test(normalized);
+    return /\bpkg-guard\s+check\b/.test(normalized) || /\bnpm\s+pack\b.*(?:^|\s)--dry-run(?:\s|$)/.test(normalized);
   });
 }
 

@@ -1,16 +1,16 @@
 {
   "name": "pkg-guard",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Guard npm package manifests, entry points, and release workflows before publishing.",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jeremyaaron/cuddly-eureka.git"
+    "url": "git+https://github.com/jeremyaaron/pkg-guard.git"
   },
   "bugs": {
-    "url": "https://github.com/jeremyaaron/cuddly-eureka/issues"
+    "url": "https://github.com/jeremyaaron/pkg-guard/issues"
   },
-  "homepage": "https://github.com/jeremyaaron/cuddly-eureka#readme",
+  "homepage": "https://jeremyaaron.github.io/pkg-guard/",
   "type": "module",
   "bin": {
     "pkg-guard": "./dist/cli/index.js"
@@ -18,10 +18,13 @@
   "files": [
     "dist",
     "README.md",
-    "docs"
+    "docs",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node scripts/mark-bin-executable.mjs",
+    "verify:publish": "npm run lint && npm run typecheck && npm test && npm run build && node dist/cli/index.js check && npm pack --dry-run --ignore-scripts",
+    "prepublishOnly": "npm run verify:publish",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint ."

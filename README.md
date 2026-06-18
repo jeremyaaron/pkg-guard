@@ -4,6 +4,8 @@ Guard npm package manifests, entry points, and release workflows before publishi
 
 `pkg-guard` is a TypeScript CLI for npm package publishing hygiene. It audits package metadata, declared entry points, packed package contents, TypeScript declaration settings, GitHub Actions npm publishing workflows, and conservative dependency risks.
 
+Product site: <https://jeremyaaron.github.io/pkg-guard/>
+
 ## Install
 
 ```sh
@@ -45,6 +47,7 @@ See [configuration](docs/configuration.md) and [check IDs](docs/checks.md).
 - [Check IDs](docs/checks.md)
 - [Configuration](docs/configuration.md)
 - [Release workflow generation](docs/release-workflow.md)
+- [Publishing](docs/publishing.md)
 - [Examples](docs/examples.md)
 - [Technical design](docs/technical-design.md)
 

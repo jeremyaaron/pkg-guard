@@ -203,22 +203,23 @@ async function getCheckFindings(root: string) {
   return [...discovery.findings, ...runChecks(discovery.context)];
 }
 
-async function createFixture(options: { workflow: string }): Promise<string> {
+async function createFixture(options: { workflow: string; scripts?: unknown }): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "pkg-guard-workflow-"));
+  const manifest: Record<string, unknown> = {
+    name: "workflow-fixture",
+    version: "1.0.0",
+    license: "MIT",
+    packageManager: "npm@10.8.2",
+    files: ["dist", "README.md", "LICENSE"]
+  };
+
+  if (Object.hasOwn(options, "scripts")) {
+    manifest.scripts = options.scripts;
+  }
 
   await writeFile(
     join(root, "package.json"),
-    `${JSON.stringify(
-      {
-        name: "workflow-fixture",
-        version: "1.0.0",
-        license: "MIT",
-        packageManager: "npm@10.8.2",
-        files: ["dist", "README.md", "LICENSE"]
-      },
-      null,
-      2
-    )}\n`
+    `${JSON.stringify(manifest, null, 2)}\n`
   );
   await mkdir(join(root, "dist"), { recursive: true });
   await writeFile(join(root, "README.md"), "# Fixture\n");

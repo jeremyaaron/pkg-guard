@@ -84,6 +84,14 @@ Acceptance criteria:
 - Existing workflow tests still pass with the updated fixture helper.
 - New tests can express package script chains without duplicating package fixture setup.
 
+Status:
+
+- Completed on 2026-06-20.
+- `tests/workflows.test.ts` fixture helper now accepts optional `scripts`.
+- The helper preserves existing package fixture defaults when `scripts` is omitted.
+- `npm test -- tests/workflows.test.ts` passed: 7 workflow tests.
+- `npm run typecheck` passed.
+
 ## Phase 2: Failing Coverage for Script Expansion
 
 Goal: encode the PRD acceptance criteria before implementing the production change.

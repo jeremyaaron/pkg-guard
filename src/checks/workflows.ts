@@ -10,6 +10,7 @@ interface WorkflowAnalysis {
   data: Record<string, unknown>;
   packageScripts: Record<string, string>;
   publishSteps: string[];
+  scriptInvocations: string[];
   stepRuns: string[];
 }
 
@@ -83,6 +84,7 @@ function buildWorkflowAnalysis(
     data,
     packageScripts,
     stepRuns,
+    scriptInvocations: stepRuns.flatMap(collectScriptInvocations),
     publishSteps: stepRuns.filter(isPublishCommand)
   };
 }
@@ -315,6 +317,31 @@ function getPackageScripts(value: unknown): Record<string, string> {
   return Object.fromEntries(
     Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string")
   );
+}
+
+function collectScriptInvocations(command: string): string[] {
+  const normalized = normalizeCommand(command);
+  const scriptNames: string[] = [];
+  const explicitRunPattern = /\b(?:npm|pnpm|yarn|bun)\s+(?:run|run-script)\s+([^\s&|;()<>]+)/g;
+  const directRunPattern = /\b(?:npm|pnpm|yarn)\s+([^\s&|;()<>]+)/g;
+
+  for (const match of normalized.matchAll(explicitRunPattern)) {
+    const scriptName = match[1];
+
+    if (scriptName) {
+      scriptNames.push(scriptName);
+    }
+  }
+
+  for (const match of normalized.matchAll(directRunPattern)) {
+    const scriptName = match[1];
+
+    if (scriptName && scriptName !== "run" && scriptName !== "run-script") {
+      scriptNames.push(scriptName);
+    }
+  }
+
+  return scriptNames;
 }
 
 function relativeWorkflowPath(workflow: WorkflowInfo): string {

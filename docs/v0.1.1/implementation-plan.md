@@ -205,6 +205,16 @@ Acceptance criteria:
 - Script names with `:`, `-`, `_`, and `.` are discovered.
 - Flags after a script name do not prevent discovery.
 
+Status:
+
+- Completed on 2026-06-20.
+- Added private `collectScriptInvocations(command: string): string[]` helper in `src/checks/workflows.ts`.
+- Supports npm, pnpm, Yarn, and Bun script invocation forms from the technical design.
+- Seeds initial workflow-level script invocations in private workflow analysis state for Phase 5.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm test -- tests/workflows.test.ts` still fails as expected: the same 5 expansion tests require Phase 5-6 production work.
+
 ## Phase 5: Recursive Expansion
 
 Goal: build the expanded command list used by required-step workflow checks.

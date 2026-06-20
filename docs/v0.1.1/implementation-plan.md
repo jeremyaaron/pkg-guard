@@ -278,6 +278,16 @@ Acceptance criteria:
 - Direct-command workflow behavior remains unchanged.
 - Non-publish workflows remain ignored as before.
 
+Status:
+
+- Completed on 2026-06-20.
+- Required publish-step checks now use `analysis.validationCommands`.
+- Publish workflow detection still derives `publishSteps` from direct workflow `stepRuns`.
+- Token, OIDC, risky-trigger, YAML parsing, and finding text behavior were left unchanged.
+- `npm test -- tests/workflows.test.ts` passed: 16 workflow tests.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+
 ## Phase 7: Documentation and Release Notes
 
 Goal: document the behavior change at the user-facing level without exposing implementation detail unnecessarily.

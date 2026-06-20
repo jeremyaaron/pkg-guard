@@ -150,19 +150,19 @@ function checkRiskyTriggers(analysis: WorkflowAnalysis): Finding[] {
 function checkRequiredPublishSteps(analysis: WorkflowAnalysis): Finding[] {
   const findings: Finding[] = [];
 
-  if (!hasInstallStep(analysis.stepRuns)) {
+  if (!hasInstallStep(analysis.validationCommands)) {
     findings.push(missingStepFinding(analysis.workflow, "workflow.install-step-missing", "install dependencies", "Add an install step before publishing."));
   }
 
-  if (!hasTestStep(analysis.stepRuns)) {
+  if (!hasTestStep(analysis.validationCommands)) {
     findings.push(missingStepFinding(analysis.workflow, "workflow.test-step-missing", "run tests", "Run tests before publishing."));
   }
 
-  if (!hasBuildStep(analysis.stepRuns)) {
+  if (!hasBuildStep(analysis.validationCommands)) {
     findings.push(missingStepFinding(analysis.workflow, "workflow.build-step-missing", "build the package", "Build the package before publishing."));
   }
 
-  if (!hasPackageValidationStep(analysis.stepRuns)) {
+  if (!hasPackageValidationStep(analysis.validationCommands)) {
     findings.push(
       missingStepFinding(
         analysis.workflow,

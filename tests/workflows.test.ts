@@ -8,6 +8,12 @@ import { describe, expect, it } from "vitest";
 import { runChecks } from "../src/core/checks.js";
 import { discoverProject } from "../src/core/discovery.js";
 
+const missingValidationFindingIds = [
+  "workflow.test-step-missing",
+  "workflow.build-step-missing",
+  "workflow.package-validation-missing"
+];
+
 describe("workflow checks", () => {
   it("warns on long-lived npm token usage", async () => {
     const root = await createFixture({
@@ -66,6 +72,81 @@ jobs:
     const ids = (await getCheckFindings(root)).map((finding) => finding.id);
 
     expect(ids).not.toContain("workflow.package-validation-missing");
+  });
+
+  it("recognizes validation commands reached through nested npm scripts", async () => {
+    const root = await createFixture({
+      scripts: createReleaseScripts(),
+      workflow: createPublishWorkflow("npm run verify:release")
+    });
+
+    const ids = await getCheckFindingIds(root);
+
+    for (const id of missingValidationFindingIds) {
+      expect(ids).not.toContain(id);
+    }
+  });
+
+  it.each([
+    ["pnpm run verify:release"],
+    ["yarn verify:release"],
+    ["bun run verify:release"]
+  ])("recognizes validation commands reached through %s", async (command) => {
+    const root = await createFixture({
+      scripts: createReleaseScripts(),
+      workflow: createPublishWorkflow(command)
+    });
+
+    const ids = await getCheckFindingIds(root);
+
+    for (const id of missingValidationFindingIds) {
+      expect(ids).not.toContain(id);
+    }
+  });
+
+  it("terminates cyclic script expansion and keeps reachable validation commands", async () => {
+    const root = await createFixture({
+      scripts: {
+        "verify:release": "npm run test:release && npm run build:release && npm run loop && npm run pack:check",
+        "test:release": "npm test",
+        "build:release": "npm run build",
+        loop: "npm run loop",
+        "pack:check": "pkg-guard check && npm pack --dry-run --ignore-scripts"
+      },
+      workflow: createPublishWorkflow("npm run verify:release")
+    });
+
+    const ids = await getCheckFindingIds(root);
+
+    for (const id of missingValidationFindingIds) {
+      expect(ids).not.toContain(id);
+    }
+  });
+
+  it("reports missing validation when a referenced package script is absent", async () => {
+    const root = await createFixture({
+      scripts: {},
+      workflow: createPublishWorkflow("npm run verify:release")
+    });
+
+    const ids = await getCheckFindingIds(root);
+
+    expect(ids).toEqual(expect.arrayContaining(missingValidationFindingIds));
+  });
+
+  it.each([
+    ["null scripts", null],
+    ["array scripts", []],
+    ["non-string script entries", { "verify:release": false, "pack:check": 42 }]
+  ])("ignores %s without creating false validation confidence", async (_name, scripts) => {
+    const root = await createFixture({
+      scripts,
+      workflow: createPublishWorkflow("npm run verify:release")
+    });
+
+    const ids = await getCheckFindingIds(root);
+
+    expect(ids).toEqual(expect.arrayContaining(missingValidationFindingIds));
   });
 
   it("reports branch push publishing", async () => {
@@ -203,22 +284,54 @@ async function getCheckFindings(root: string) {
   return [...discovery.findings, ...runChecks(discovery.context)];
 }
 
-async function createFixture(options: { workflow: string }): Promise<string> {
+async function getCheckFindingIds(root: string): Promise<string[]> {
+  return (await getCheckFindings(root)).map((finding) => finding.id);
+}
+
+function createReleaseScripts(): Record<string, string> {
+  return {
+    "verify:release": "npm run lint && npm run format && npm run typecheck && npm test && npm run build && npm run pack:check && npm run smoke:package",
+    "pack:check": "pkg-guard check && npm pack --dry-run --ignore-scripts"
+  };
+}
+
+function createPublishWorkflow(validationCommand: string): string {
+  return `
+name: Release
+on:
+  push:
+    tags:
+      - "v*"
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm ci
+      - run: ${validationCommand}
+      - run: npm publish
+`;
+}
+
+async function createFixture(options: { workflow: string; scripts?: unknown }): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "pkg-guard-workflow-"));
+  const manifest: Record<string, unknown> = {
+    name: "workflow-fixture",
+    version: "1.0.0",
+    license: "MIT",
+    packageManager: "npm@10.8.2",
+    files: ["dist", "README.md", "LICENSE"]
+  };
+
+  if (Object.hasOwn(options, "scripts")) {
+    manifest.scripts = options.scripts;
+  }
 
   await writeFile(
     join(root, "package.json"),
-    `${JSON.stringify(
-      {
-        name: "workflow-fixture",
-        version: "1.0.0",
-        license: "MIT",
-        packageManager: "npm@10.8.2",
-        files: ["dist", "README.md", "LICENSE"]
-      },
-      null,
-      2
-    )}\n`
+    `${JSON.stringify(manifest, null, 2)}\n`
   );
   await mkdir(join(root, "dist"), { recursive: true });
   await writeFile(join(root, "README.md"), "# Fixture\n");

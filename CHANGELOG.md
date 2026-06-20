@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- Improves release workflow checks so validation commands reached through package scripts are recognized.
+- Reduces false positives for workflows that run aggregate scripts such as `npm run verify:release`, `pnpm run verify:release`, `yarn verify:release`, or `bun run verify:release` before publishing.
+
 ## 0.1.0
 
 Initial public release.

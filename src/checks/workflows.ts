@@ -8,9 +8,14 @@ import type { Finding } from "../core/findings.js";
 interface WorkflowAnalysis {
   workflow: WorkflowInfo;
   data: Record<string, unknown>;
+  packageScripts: Record<string, string>;
   publishSteps: string[];
+  scriptInvocations: string[];
   stepRuns: string[];
+  validationCommands: string[];
 }
+
+const maxPackageScriptExpansions = 50;
 
 export const workflowChecks: Check[] = [
   {
@@ -20,10 +25,11 @@ export const workflowChecks: Check[] = [
 ];
 
 function runWorkflowChecks(context: ProjectContext): Finding[] {
-  return context.workflows.flatMap((workflow) => analyzeWorkflow(workflow));
+  const packageScripts = getPackageScripts(context.manifest.data.scripts);
+  return context.workflows.flatMap((workflow) => analyzeWorkflow(workflow, packageScripts));
 }
 
-function analyzeWorkflow(workflow: WorkflowInfo): Finding[] {
+function analyzeWorkflow(workflow: WorkflowInfo, packageScripts: Record<string, string>): Finding[] {
   const parsed = parseWorkflow(workflow);
 
   if (!parsed.ok) {
@@ -38,7 +44,7 @@ function analyzeWorkflow(workflow: WorkflowInfo): Finding[] {
     ];
   }
 
-  const analysis = buildWorkflowAnalysis(workflow, parsed.data);
+  const analysis = buildWorkflowAnalysis(workflow, parsed.data, packageScripts);
 
   if (analysis.publishSteps.length === 0) {
     return [];
@@ -69,14 +75,22 @@ function parseWorkflow(workflow: WorkflowInfo): { ok: true; data: Record<string,
   }
 }
 
-function buildWorkflowAnalysis(workflow: WorkflowInfo, data: Record<string, unknown>): WorkflowAnalysis {
+function buildWorkflowAnalysis(
+  workflow: WorkflowInfo,
+  data: Record<string, unknown>,
+  packageScripts: Record<string, string>
+): WorkflowAnalysis {
   const stepRuns = collectStepRuns(data);
+  const scriptInvocations = stepRuns.flatMap(collectScriptInvocations);
 
   return {
     workflow,
     data,
+    packageScripts,
     stepRuns,
-    publishSteps: stepRuns.filter(isPublishCommand)
+    scriptInvocations,
+    publishSteps: stepRuns.filter(isPublishCommand),
+    validationCommands: expandPackageScripts(stepRuns, packageScripts, scriptInvocations)
   };
 }
 
@@ -136,19 +150,19 @@ function checkRiskyTriggers(analysis: WorkflowAnalysis): Finding[] {
 function checkRequiredPublishSteps(analysis: WorkflowAnalysis): Finding[] {
   const findings: Finding[] = [];
 
-  if (!hasInstallStep(analysis.stepRuns)) {
+  if (!hasInstallStep(analysis.validationCommands)) {
     findings.push(missingStepFinding(analysis.workflow, "workflow.install-step-missing", "install dependencies", "Add an install step before publishing."));
   }
 
-  if (!hasTestStep(analysis.stepRuns)) {
+  if (!hasTestStep(analysis.validationCommands)) {
     findings.push(missingStepFinding(analysis.workflow, "workflow.test-step-missing", "run tests", "Run tests before publishing."));
   }
 
-  if (!hasBuildStep(analysis.stepRuns)) {
+  if (!hasBuildStep(analysis.validationCommands)) {
     findings.push(missingStepFinding(analysis.workflow, "workflow.build-step-missing", "build the package", "Build the package before publishing."));
   }
 
-  if (!hasPackageValidationStep(analysis.stepRuns)) {
+  if (!hasPackageValidationStep(analysis.validationCommands)) {
     findings.push(
       missingStepFinding(
         analysis.workflow,
@@ -298,6 +312,74 @@ function hasPackageValidationStep(commands: string[]): boolean {
 
 function normalizeCommand(command: string): string {
   return command.replace(/\\\n/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function getPackageScripts(value: unknown): Record<string, string> {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string")
+  );
+}
+
+function collectScriptInvocations(command: string): string[] {
+  const normalized = normalizeCommand(command);
+  const scriptNames: string[] = [];
+  const explicitRunPattern = /\b(?:npm|pnpm|yarn|bun)\s+(?:run|run-script)\s+([^\s&|;()<>]+)/g;
+  const directRunPattern = /\b(?:npm|pnpm|yarn)\s+([^\s&|;()<>]+)/g;
+
+  for (const match of normalized.matchAll(explicitRunPattern)) {
+    const scriptName = match[1];
+
+    if (scriptName) {
+      scriptNames.push(scriptName);
+    }
+  }
+
+  for (const match of normalized.matchAll(directRunPattern)) {
+    const scriptName = match[1];
+
+    if (scriptName && scriptName !== "run" && scriptName !== "run-script") {
+      scriptNames.push(scriptName);
+    }
+  }
+
+  return scriptNames;
+}
+
+function expandPackageScripts(
+  commands: string[],
+  scripts: Record<string, string>,
+  initialInvocations = commands.flatMap(collectScriptInvocations)
+): string[] {
+  const expanded = [...commands];
+  const visited = new Set<string>();
+  const queue = [...initialInvocations];
+  let expansionCount = 0;
+
+  while (queue.length > 0 && expansionCount < maxPackageScriptExpansions) {
+    const scriptName = queue.shift();
+
+    if (!scriptName || visited.has(scriptName)) {
+      continue;
+    }
+
+    visited.add(scriptName);
+
+    const scriptCommand = scripts[scriptName];
+
+    if (!scriptCommand) {
+      continue;
+    }
+
+    expanded.push(scriptCommand);
+    expansionCount += 1;
+    queue.push(...collectScriptInvocations(scriptCommand));
+  }
+
+  return expanded;
 }
 
 function relativeWorkflowPath(workflow: WorkflowInfo): string {

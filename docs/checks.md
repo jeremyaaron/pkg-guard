@@ -66,6 +66,8 @@ npx pkg-guard check --ignore dependencies.runtime-in-dev
 
 ## Workflows
 
+Workflow validation recognizes direct GitHub Actions `run:` commands and validation commands reached through package scripts such as `npm run verify:release`, `pnpm run verify:release`, `yarn verify:release`, and `bun run verify:release`.
+
 | ID | Default | Rationale |
 | --- | --- | --- |
 | `workflow.yaml-invalid` | warning | Invalid workflow YAML cannot be analyzed. |

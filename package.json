@@ -1,6 +1,6 @@
 {
   "name": "pkg-guard",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Guard npm package manifests, entry points, and release workflows before publishing.",
   "license": "MIT",
   "repository": {

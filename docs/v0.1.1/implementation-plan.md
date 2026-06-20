@@ -308,6 +308,13 @@ Acceptance criteria:
 - The changelog describes the false-positive fix clearly.
 - User-facing docs remain focused on usage, not internal planning.
 
+Status:
+
+- Completed on 2026-06-20.
+- Added a `0.1.1` changelog entry describing package-script workflow validation detection.
+- Added a concise workflow note to `docs/checks.md` explaining that direct workflow commands and reachable package scripts are recognized.
+- Did not link development docs from the README.
+
 ## Phase 8: Final Verification
 
 Goal: verify the patch is ready to release.

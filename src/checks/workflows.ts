@@ -8,6 +8,7 @@ import type { Finding } from "../core/findings.js";
 interface WorkflowAnalysis {
   workflow: WorkflowInfo;
   data: Record<string, unknown>;
+  packageScripts: Record<string, string>;
   publishSteps: string[];
   stepRuns: string[];
 }
@@ -20,10 +21,11 @@ export const workflowChecks: Check[] = [
 ];
 
 function runWorkflowChecks(context: ProjectContext): Finding[] {
-  return context.workflows.flatMap((workflow) => analyzeWorkflow(workflow));
+  const packageScripts = getPackageScripts(context.manifest.data.scripts);
+  return context.workflows.flatMap((workflow) => analyzeWorkflow(workflow, packageScripts));
 }
 
-function analyzeWorkflow(workflow: WorkflowInfo): Finding[] {
+function analyzeWorkflow(workflow: WorkflowInfo, packageScripts: Record<string, string>): Finding[] {
   const parsed = parseWorkflow(workflow);
 
   if (!parsed.ok) {
@@ -38,7 +40,7 @@ function analyzeWorkflow(workflow: WorkflowInfo): Finding[] {
     ];
   }
 
-  const analysis = buildWorkflowAnalysis(workflow, parsed.data);
+  const analysis = buildWorkflowAnalysis(workflow, parsed.data, packageScripts);
 
   if (analysis.publishSteps.length === 0) {
     return [];
@@ -69,12 +71,17 @@ function parseWorkflow(workflow: WorkflowInfo): { ok: true; data: Record<string,
   }
 }
 
-function buildWorkflowAnalysis(workflow: WorkflowInfo, data: Record<string, unknown>): WorkflowAnalysis {
+function buildWorkflowAnalysis(
+  workflow: WorkflowInfo,
+  data: Record<string, unknown>,
+  packageScripts: Record<string, string>
+): WorkflowAnalysis {
   const stepRuns = collectStepRuns(data);
 
   return {
     workflow,
     data,
+    packageScripts,
     stepRuns,
     publishSteps: stepRuns.filter(isPublishCommand)
   };
@@ -298,6 +305,16 @@ function hasPackageValidationStep(commands: string[]): boolean {
 
 function normalizeCommand(command: string): string {
   return command.replace(/\\\n/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function getPackageScripts(value: unknown): Record<string, string> {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string")
+  );
 }
 
 function relativeWorkflowPath(workflow: WorkflowInfo): string {

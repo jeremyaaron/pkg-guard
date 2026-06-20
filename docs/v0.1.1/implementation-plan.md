@@ -160,6 +160,15 @@ Acceptance criteria:
 - Malformed `scripts` data does not crash workflow analysis.
 - TypeScript remains clean without weakening manifest types.
 
+Status:
+
+- Completed on 2026-06-20.
+- Added private `getPackageScripts(value: unknown): Record<string, string>` helper in `src/checks/workflows.ts`.
+- Extracted string-valued package scripts from `context.manifest.data.scripts`.
+- Passed extracted package scripts into private workflow analysis state without changing `ProjectContext`.
+- `npm run typecheck` passed.
+- `npm test -- tests/workflows.test.ts` still fails as expected: the same 5 Phase 2 expansion tests require Phase 4-6 production work.
+
 ## Phase 4: Script Invocation Detection
 
 Goal: detect package script names referenced inside workflow and package script command strings.

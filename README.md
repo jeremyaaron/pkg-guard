@@ -49,7 +49,6 @@ See [configuration](docs/configuration.md) and [check IDs](docs/checks.md).
 - [Release workflow generation](docs/release-workflow.md)
 - [Publishing](docs/publishing.md)
 - [Examples](docs/examples.md)
-- [Technical design](docs/technical-design.md)
 
 ## Development
 

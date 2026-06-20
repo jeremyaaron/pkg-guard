@@ -344,6 +344,16 @@ Acceptance criteria:
 - No unrelated files are changed.
 - The final diff maps cleanly to the v0.1.1 PRD and technical design.
 
+Status:
+
+- Completed on 2026-06-20.
+- `npm test -- tests/workflows.test.ts` passed: 16 workflow tests.
+- `npm test` passed: 83 tests across 11 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed and reported no issues.
+
 ## Review Checklist
 
 - Script expansion is static only.

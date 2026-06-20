@@ -125,6 +125,15 @@ Acceptance criteria:
 - New tests fail for the expected reason before production implementation.
 - Test names clearly describe the behavior being protected.
 
+Status:
+
+- Completed on 2026-06-20.
+- Added expected-behavior workflow tests for nested `npm run verify:release` expansion.
+- Added package-manager equivalent coverage for `pnpm run verify:release`, `yarn verify:release`, and `bun run verify:release`.
+- Added edge-case coverage for cyclic scripts, missing referenced scripts, and malformed or non-string `scripts` values.
+- `npm test -- tests/workflows.test.ts` now fails as expected: 5 expansion tests still report `workflow.test-step-missing` before production implementation.
+- `npm run typecheck` passed.
+
 ## Phase 3: Package Script Extraction
 
 Goal: make workflow analysis aware of string-valued package scripts from the existing project context.

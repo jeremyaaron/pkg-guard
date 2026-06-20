@@ -12,7 +12,10 @@ interface WorkflowAnalysis {
   publishSteps: string[];
   scriptInvocations: string[];
   stepRuns: string[];
+  validationCommands: string[];
 }
+
+const maxPackageScriptExpansions = 50;
 
 export const workflowChecks: Check[] = [
   {
@@ -78,14 +81,16 @@ function buildWorkflowAnalysis(
   packageScripts: Record<string, string>
 ): WorkflowAnalysis {
   const stepRuns = collectStepRuns(data);
+  const scriptInvocations = stepRuns.flatMap(collectScriptInvocations);
 
   return {
     workflow,
     data,
     packageScripts,
     stepRuns,
-    scriptInvocations: stepRuns.flatMap(collectScriptInvocations),
-    publishSteps: stepRuns.filter(isPublishCommand)
+    scriptInvocations,
+    publishSteps: stepRuns.filter(isPublishCommand),
+    validationCommands: expandPackageScripts(stepRuns, packageScripts, scriptInvocations)
   };
 }
 
@@ -342,6 +347,39 @@ function collectScriptInvocations(command: string): string[] {
   }
 
   return scriptNames;
+}
+
+function expandPackageScripts(
+  commands: string[],
+  scripts: Record<string, string>,
+  initialInvocations = commands.flatMap(collectScriptInvocations)
+): string[] {
+  const expanded = [...commands];
+  const visited = new Set<string>();
+  const queue = [...initialInvocations];
+  let expansionCount = 0;
+
+  while (queue.length > 0 && expansionCount < maxPackageScriptExpansions) {
+    const scriptName = queue.shift();
+
+    if (!scriptName || visited.has(scriptName)) {
+      continue;
+    }
+
+    visited.add(scriptName);
+
+    const scriptCommand = scripts[scriptName];
+
+    if (!scriptCommand) {
+      continue;
+    }
+
+    expanded.push(scriptCommand);
+    expansionCount += 1;
+    queue.push(...collectScriptInvocations(scriptCommand));
+  }
+
+  return expanded;
 }
 
 function relativeWorkflowPath(workflow: WorkflowInfo): string {

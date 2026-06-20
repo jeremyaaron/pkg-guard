@@ -244,6 +244,17 @@ Acceptance criteria:
 - Cyclic scripts terminate.
 - Unknown script names are ignored.
 
+Status:
+
+- Completed on 2026-06-20.
+- Added private `expandPackageScripts(commands, scripts)` helper in `src/checks/workflows.ts`.
+- Expansion includes original workflow commands and reachable package script commands.
+- Expansion uses both visited-script cycle protection and a `50` script expansion cap.
+- Private workflow analysis now computes `validationCommands` for Phase 6.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm test -- tests/workflows.test.ts` still fails as expected: the same 5 expansion tests require Phase 6 wiring.
+
 ## Phase 6: Wire Expanded Commands into Workflow Analysis
 
 Goal: use the expanded command list for missing-step checks while preserving existing publish workflow detection.

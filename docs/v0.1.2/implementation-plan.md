@@ -54,6 +54,20 @@ Acceptance criteria:
 - Release tests cover unscoped, scoped public, scoped restricted, and private package behavior.
 - Existing npm, pnpm, Yarn, and Bun install command tests still pass.
 
+Status:
+
+- Completed on 2026-06-21.
+- `src/core/release.ts` now derives a publish command from `package.json`.
+- Unscoped packages keep `npm publish`.
+- Scoped public packages use `npm publish --access public`.
+- `publishConfig.access` values of `public` and `restricted` are respected.
+- `private: true` packages return a non-created result and do not write a workflow.
+- Init-release human and JSON output include the selected publish command when one exists.
+- `npm test -- tests/release.test.ts` passed: 10 release tests.
+- `npm test -- tests/release.test.ts tests/fixes.test.ts` passed: 17 tests across 2 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+
 ## Phase 2: Types Fix Finding Consistency
 
 Goal: make `fix.types` trace back to a real documented finding.

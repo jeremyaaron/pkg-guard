@@ -1,12 +1,13 @@
 import { access, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import type { PackageManagerInfo, ProjectContext } from "./context.js";
+import type { PackageManagerInfo, PackageManifest, ProjectContext } from "./context.js";
 
 export interface InitReleaseResult {
   created: boolean;
   path: string;
   installCommand: string;
+  publishCommand: string | null;
   packageManagerSetupSteps: string[];
   message: string;
 }
@@ -17,11 +18,25 @@ export async function initReleaseWorkflow(context: ProjectContext): Promise<Init
   const installCommand = getInstallCommand(context.packageManager);
   const packageManagerSetupSteps = getPackageManagerSetupSteps(context.packageManager);
 
+  if (context.manifest.data.private === true) {
+    return {
+      created: false,
+      path: relativePath,
+      installCommand,
+      publishCommand: null,
+      packageManagerSetupSteps,
+      message: "package.json has private: true; pkg-guard did not create a publish workflow."
+    };
+  }
+
+  const publishCommand = getPublishCommand(context.manifest.data);
+
   if (await fileExists(workflowPath)) {
     return {
       created: false,
       path: relativePath,
       installCommand,
+      publishCommand,
       packageManagerSetupSteps,
       message: `${relativePath} already exists; pkg-guard did not overwrite it.`
     };
@@ -32,6 +47,7 @@ export async function initReleaseWorkflow(context: ProjectContext): Promise<Init
     workflowPath,
     renderReleaseWorkflow({
       installCommand,
+      publishCommand,
       packageManagerSetupSteps
     }),
     "utf8"
@@ -41,16 +57,25 @@ export async function initReleaseWorkflow(context: ProjectContext): Promise<Init
     created: true,
     path: relativePath,
     installCommand,
+    publishCommand,
     packageManagerSetupSteps,
     message: `Created ${relativePath}. Configure npm trusted publishing for this package using workflow release.yml.`
   };
 }
 
 export function renderInitReleaseHuman(result: InitReleaseResult): string {
-  const lines = [result.message, "", "npm trusted publishing setup:", "  Provider: GitHub Actions", "  Workflow: release.yml", "  Trigger: v* Git tags"];
+  const lines = [result.message];
+
+  if (result.publishCommand) {
+    lines.push("", `Publish command: ${result.publishCommand}`);
+  }
+
+  if (result.created || result.publishCommand) {
+    lines.push("", "npm trusted publishing setup:", "  Provider: GitHub Actions", "  Workflow: release.yml", "  Trigger: v* Git tags");
+  }
 
   if (result.created) {
-    lines.push("", "Generated workflow uses npm publish with id-token: write.");
+    lines.push("", `Generated workflow uses ${result.publishCommand} with id-token: write.`);
   }
 
   return `${lines.join("\n")}\n`;
@@ -73,7 +98,11 @@ export function renderInitReleaseJson(result: InitReleaseResult): string {
   )}\n`;
 }
 
-function renderReleaseWorkflow(options: { installCommand: string; packageManagerSetupSteps: string[] }): string {
+function renderReleaseWorkflow(options: {
+  installCommand: string;
+  publishCommand: string;
+  packageManagerSetupSteps: string[];
+}): string {
   const setupSteps = options.packageManagerSetupSteps.map((step) => `      - ${step}\n`).join("");
 
   return `name: Release
@@ -102,7 +131,7 @@ ${setupSteps}      - run: ${options.installCommand}
       - run: npm run build --if-present
       - run: npx pkg-guard check
       # Configure npm trusted publishing for this package on npmjs.com using this workflow filename.
-      - run: npm publish
+      - run: ${options.publishCommand}
 `;
 }
 
@@ -135,6 +164,28 @@ function getPackageManagerSetupSteps(packageManager: PackageManagerInfo): string
   return [];
 }
 
+function getPublishCommand(manifest: PackageManifest): string {
+  const access = getPublishAccess(manifest.publishConfig);
+
+  if (access) {
+    return `npm publish --access ${access}`;
+  }
+
+  if (typeof manifest.name === "string" && manifest.name.startsWith("@")) {
+    return "npm publish --access public";
+  }
+
+  return "npm publish";
+}
+
+function getPublishAccess(value: unknown): "public" | "restricted" | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return value.access === "public" || value.access === "restricted" ? value.access : null;
+}
+
 async function fileExists(filePath: string): Promise<boolean> {
   try {
     await access(filePath);
@@ -142,4 +193,8 @@ async function fileExists(filePath: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }

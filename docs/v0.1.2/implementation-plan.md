@@ -92,6 +92,21 @@ Acceptance criteria:
 - `fix --json` references only real finding IDs.
 - Existing fix idempotency tests still pass.
 
+Status:
+
+- Completed on 2026-06-21.
+- Added a narrow `manifest.types-missing` warning when `dist/index.d.ts` exists and `package.json` has neither `types` nor `typings`.
+- Marked the finding as fixable so it lines up with the existing `fix.types` plan.
+- Documented `manifest.types-missing` in `docs/checks.md`.
+- Added manifest tests for the detectable missing-types case and the existing-types non-finding case.
+- Added a fix JSON test confirming `fix.types` references `manifest.types-missing`.
+- `npm test -- tests/manifest-checks.test.ts tests/fixes.test.ts` passed: 16 tests across 2 test files.
+- `npm test -- tests/release.test.ts tests/fixes.test.ts tests/manifest-checks.test.ts` passed: 26 tests across 3 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed.
+
 ## Phase 3: Documentation and Changelog
 
 Goal: make the patch easy to review and release.

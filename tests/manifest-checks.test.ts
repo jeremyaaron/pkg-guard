@@ -114,6 +114,53 @@ describe("manifest checks", () => {
     expect(findings.map((finding) => finding.id)).toContain("manifest.private-publishable");
   });
 
+  it("reports missing types metadata when dist declarations are present", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "types-missing-fixture",
+        version: "1.0.0",
+        license: "MIT",
+        packageManager: "npm@10.8.2",
+        files: ["dist"]
+      },
+      files: {
+        "package-lock.json": "{}\n",
+        "dist/index.d.ts": "export {};\n"
+      }
+    });
+
+    const findings = await getCheckFindings(root);
+    const finding = findings.find((item) => item.id === "manifest.types-missing");
+
+    expect(finding).toMatchObject({
+      severity: "warning",
+      file: "package.json",
+      path: "$.types",
+      fixable: true
+    });
+  });
+
+  it("does not report missing types metadata when types already exists", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "types-existing-fixture",
+        version: "1.0.0",
+        license: "MIT",
+        packageManager: "npm@10.8.2",
+        files: ["dist"],
+        types: "./dist/index.d.ts"
+      },
+      files: {
+        "package-lock.json": "{}\n",
+        "dist/index.d.ts": "export {};\n"
+      }
+    });
+
+    const findings = await getCheckFindings(root);
+
+    expect(findings.map((finding) => finding.id)).not.toContain("manifest.types-missing");
+  });
+
   it("applies configured ignores and strict warnings", async () => {
     const root = await createFixture({
       packageJson: {

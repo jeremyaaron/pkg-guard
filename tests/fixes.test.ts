@@ -193,6 +193,38 @@ describe("pkg-guard fix", () => {
     expect(result.stdout).toContain("fix.types");
     expect(manifest.types).toBe("./dist/index.d.ts");
   });
+
+  it("reports a real finding ID for the types fix in JSON output", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "types-json-fixture",
+        version: "1.0.0",
+        license: "MIT",
+        packageManager: "npm@10.8.2",
+        files: ["dist"]
+      },
+      files: {
+        "package-lock.json": "{}\n",
+        "dist/index.d.ts": "export {};\n"
+      }
+    });
+
+    const result = await invoke(["fix", "--dry-run", "--json"], root);
+    const json = JSON.parse(result.stdout) as {
+      fixes: Array<{
+        id: string;
+        findingId: string;
+      }>;
+    };
+
+    expect(result.exitCode).toBe(0);
+    expect(json.fixes).toContainEqual(
+      expect.objectContaining({
+        id: "fix.types",
+        findingId: "manifest.types-missing"
+      })
+    );
+  });
 });
 
 async function invoke(args: string[], cwd: string): Promise<{

@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
+
 import spdxExpressionParse from "spdx-expression-parse";
 import { valid as validSemver } from "semver";
 
@@ -22,6 +25,7 @@ function runManifestChecks(context: ProjectContext): Finding[] {
   findings.push(...checkLicense(manifest));
   findings.push(...checkRepository(context));
   findings.push(...checkFiles(manifest));
+  findings.push(...checkTypesMetadata(context));
   findings.push(...checkPrivatePublishable(manifest));
 
   return findings;
@@ -189,6 +193,32 @@ function checkFiles(manifest: PackageManifest): Finding[] {
       file: "package.json",
       path: "$.files",
       suggestion: "Add a files array once build output is known."
+    }
+  ];
+}
+
+function checkTypesMetadata(context: ProjectContext): Finding[] {
+  const manifest = context.manifest.data;
+
+  if (
+    manifest.private === true ||
+    manifest.types !== undefined ||
+    manifest.typings !== undefined ||
+    !existsSync(path.join(context.root, "dist", "index.d.ts"))
+  ) {
+    return [];
+  }
+
+  return [
+    {
+      id: "manifest.types-missing",
+      severity: "warning",
+      title: "Types metadata is missing",
+      message: "dist/index.d.ts exists, but package.json does not define types or typings.",
+      file: "package.json",
+      path: "$.types",
+      suggestion: "Add top-level types metadata that points at ./dist/index.d.ts.",
+      fixable: true
     }
   ];
 }

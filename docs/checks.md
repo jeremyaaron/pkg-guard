@@ -31,6 +31,7 @@ npx pkg-guard check --ignore dependencies.runtime-in-dev
 | `manifest.license-invalid` | warning | License metadata should be SPDX-valid or `UNLICENSED`. |
 | `manifest.repository-missing` | warning | Repository metadata improves package traceability. |
 | `manifest.files-missing` | warning | Unconstrained packlists can publish unintended files. |
+| `manifest.types-missing` | warning | Generated declarations should be exposed through package type metadata. |
 | `manifest.private-publishable` | warning | `private: true` conflicts with publish-oriented metadata. |
 
 ## Entry Points

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2
+
+- Updates `pkg-guard init-release` so scoped packages publish with the correct npm access flag.
+- Refuses to generate a publish workflow for packages marked `private: true`.
+- Adds `manifest.types-missing` so the existing `fix.types` plan references a documented check ID.
+
 ## 0.1.1
 
 - Improves release workflow checks so validation commands reached through package scripts are recognized.

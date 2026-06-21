@@ -23,6 +23,7 @@ describe("init-release", () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("Created .github/workflows/release.yml");
+    expect(result.stdout).toContain("Publish command: npm publish");
     expect(workflow).toContain('tags:\n      - "v*"');
     expect(workflow).toContain("id-token: write");
     expect(workflow).toContain('node-version: "24"');
@@ -31,6 +32,66 @@ describe("init-release", () => {
     expect(workflow).toContain("- run: npm run build --if-present");
     expect(workflow).toContain("- run: npx pkg-guard check");
     expect(workflow).toContain("- run: npm publish");
+  });
+
+  it("uses public access when generating a scoped package release workflow", async () => {
+    const root = await createFixture({
+      packageJson: basePackage({
+        name: "@scope/release-fixture",
+        packageManager: "npm@10.8.2"
+      }),
+      lockfiles: {
+        "package-lock.json": "{}\n"
+      }
+    });
+
+    const result = await invoke(["init-release"], root);
+    const workflow = await readWorkflow(root);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Publish command: npm publish --access public");
+    expect(workflow).toContain("- run: npm publish --access public");
+  });
+
+  it.each([
+    ["public", "npm publish --access public"],
+    ["restricted", "npm publish --access restricted"]
+  ])("respects publishConfig.access %s", async (access, publishCommand) => {
+    const root = await createFixture({
+      packageJson: basePackage({
+        name: "@scope/release-fixture",
+        packageManager: "npm@10.8.2",
+        publishConfig: {
+          access
+        }
+      }),
+      lockfiles: {
+        "package-lock.json": "{}\n"
+      }
+    });
+
+    await invoke(["init-release"], root);
+    const workflow = await readWorkflow(root);
+
+    expect(workflow).toContain(`- run: ${publishCommand}`);
+  });
+
+  it("refuses to create a release workflow for private packages", async () => {
+    const root = await createFixture({
+      packageJson: basePackage({
+        packageManager: "npm@10.8.2",
+        private: true
+      }),
+      lockfiles: {
+        "package-lock.json": "{}\n"
+      }
+    });
+
+    const result = await invoke(["init-release"], root);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toContain("private: true");
+    await expect(readWorkflow(root)).rejects.toThrow();
   });
 
   it("generates pnpm setup and install steps", async () => {
@@ -121,6 +182,7 @@ describe("init-release", () => {
       created: boolean;
       path: string;
       installCommand: string;
+      publishCommand: string;
       trustedPublishing: { workflow: string; trigger: string };
     };
 
@@ -129,6 +191,7 @@ describe("init-release", () => {
     expect(json.created).toBe(true);
     expect(json.path).toBe(".github/workflows/release.yml");
     expect(json.installCommand).toBe("npm ci");
+    expect(json.publishCommand).toBe("npm publish");
     expect(json.trustedPublishing).toEqual({
       provider: "GitHub Actions",
       workflow: "release.yml",

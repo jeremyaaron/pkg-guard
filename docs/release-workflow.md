@@ -8,6 +8,8 @@ npx pkg-guard init-release
 
 The command refuses to overwrite an existing release workflow.
 
+The command also refuses to create a publish workflow when `package.json` has `private: true`.
+
 ## Generated Behavior
 
 The workflow:
@@ -18,7 +20,7 @@ The workflow:
 - installs dependencies with the detected package manager
 - runs tests and build scripts when present
 - runs `npx pkg-guard check`
-- publishes with `npm publish`
+- publishes with an npm command selected from package metadata
 
 Publishing still requires npm-side trusted publisher configuration for the package on npmjs.com. Use:
 
@@ -38,4 +40,13 @@ Dependency installation is selected from `packageManager` and lockfiles:
 | modern Yarn | `corepack enable` then `yarn install --immutable` |
 | Bun | `oven-sh/setup-bun@v2` then `bun install --frozen-lockfile` |
 
-The publish step is always `npm publish` because npm trusted publishing is tied to npm publishing.
+## Publish Command
+
+The publish step always uses the npm CLI because npm trusted publishing is tied to npm publishing, but the command changes based on package metadata:
+
+| Package metadata | Publish step |
+| --- | --- |
+| Unscoped package | `npm publish` |
+| Scoped package without `publishConfig.access` | `npm publish --access public` |
+| `publishConfig.access: "public"` | `npm publish --access public` |
+| `publishConfig.access: "restricted"` | `npm publish --access restricted` |

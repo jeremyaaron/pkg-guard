@@ -121,6 +121,13 @@ Acceptance criteria:
 
 - User-facing docs describe behavior, not implementation internals.
 
+Status:
+
+- Completed on 2026-06-21.
+- Added a `0.1.2` changelog entry for scoped publish access, private package workflow refusal, and `manifest.types-missing`.
+- Updated `docs/release-workflow.md` to document private package refusal and publish command selection.
+- `manifest.types-missing` was already documented in `docs/checks.md` during Phase 2.
+
 ## Phase 4: Final Verification
 
 Goal: verify the patch is release-ready.
@@ -142,3 +149,15 @@ Acceptance criteria:
 - All checks pass.
 - Packed output remains clean.
 - The final diff maps only to v0.1.2 scope.
+
+Status:
+
+- Completed on 2026-06-21.
+- Bumped `package.json` and `package-lock.json` from `0.1.1` to `0.1.2`.
+- `npm test -- tests/release.test.ts tests/fixes.test.ts tests/manifest-checks.test.ts` passed: 26 tests across 3 test files.
+- `npm test` passed: 90 tests across 11 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed.
+- `npm pack --dry-run --json --ignore-scripts` passed and produced `pkg-guard-0.1.2.tgz`.

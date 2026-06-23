@@ -4,11 +4,19 @@ import type { Check } from "../core/checks.js";
 import type { PackageManifest, ProjectContext } from "../core/context.js";
 import type { Finding } from "../core/findings.js";
 
-interface DeclaredTarget {
-  source: "main" | "module" | "types" | "exports" | "bin";
-  target: string;
-  jsonPath: string;
-}
+type DeclaredTarget =
+  | {
+      kind: "file";
+      source: "main" | "module" | "types" | "exports" | "bin";
+      target: string;
+      jsonPath: string;
+    }
+  | {
+      kind: "pattern";
+      source: "exports";
+      targetPattern: string;
+      jsonPath: string;
+    };
 
 export const packChecks: Check[] = [
   {
@@ -87,6 +95,11 @@ function checkDeclaredTargetsPacked(context: ProjectContext, files: Set<string>)
   const targets = collectDeclaredTargets(context.manifest.data, findings);
 
   for (const target of targets) {
+    if (target.kind === "pattern") {
+      findings.push(...checkDeclaredPatternPacked(target, files));
+      continue;
+    }
+
     const normalizedTarget = normalizeManifestTarget(target.target);
 
     if (!normalizedTarget) {
@@ -107,6 +120,30 @@ function checkDeclaredTargetsPacked(context: ProjectContext, files: Set<string>)
   }
 
   return findings;
+}
+
+function checkDeclaredPatternPacked(target: Extract<DeclaredTarget, { kind: "pattern" }>, files: Set<string>): Finding[] {
+  const normalizedPattern = normalizeManifestPattern(target.targetPattern);
+
+  if (!normalizedPattern) {
+    return [];
+  }
+
+  if (matchesPackPattern(files, normalizedPattern)) {
+    return [];
+  }
+
+  return [
+    {
+      id: "pack.entrypoint-missing",
+      severity: "error",
+      title: "Declared entry point pattern is missing from the package",
+      message: `${target.source} target pattern ${JSON.stringify(target.targetPattern)} does not match any files in npm pack output.`,
+      file: "package.json",
+      path: target.jsonPath,
+      suggestion: "Update package files configuration or entrypoint metadata so the published package includes these files."
+    }
+  ];
 }
 
 function collectDeclaredTargets(manifest: PackageManifest, findings: Finding[]): DeclaredTarget[] {
@@ -134,7 +171,7 @@ function collectTopLevelTarget(
   }
 
   if (typeof value === "string") {
-    targets.push({ source, target: value, jsonPath });
+    targets.push({ kind: "file", source, target: value, jsonPath });
     return;
   }
 
@@ -147,14 +184,14 @@ function collectBinTargets(targets: DeclaredTarget[], findings: Finding[], value
   }
 
   if (typeof value === "string") {
-    targets.push({ source: "bin", target: value, jsonPath: "$.bin" });
+    targets.push({ kind: "file", source: "bin", target: value, jsonPath: "$.bin" });
     return;
   }
 
   if (isRecord(value)) {
     for (const [name, target] of Object.entries(value)) {
       if (typeof target === "string") {
-        targets.push({ source: "bin", target, jsonPath: `$.bin.${formatJsonPathKey(name)}` });
+        targets.push({ kind: "file", source: "bin", target, jsonPath: `$.bin.${formatJsonPathKey(name)}` });
       } else {
         findings.push(unsupportedTargetFinding(`$.bin.${formatJsonPathKey(name)}`));
       }
@@ -175,8 +212,14 @@ function collectExportTargets(targets: DeclaredTarget[], findings: Finding[], va
 
 function collectExportValue(targets: DeclaredTarget[], findings: Finding[], value: unknown, jsonPath: string): void {
   if (typeof value === "string") {
-    if (!value.includes("*")) {
-      targets.push({ source: "exports", target: value, jsonPath });
+    if (value.includes("*")) {
+      if (isSimplePattern(value)) {
+        targets.push({ kind: "pattern", source: "exports", targetPattern: value, jsonPath });
+      } else {
+        findings.push(unsupportedTargetFinding(jsonPath));
+      }
+    } else {
+      targets.push({ kind: "file", source: "exports", target: value, jsonPath });
     }
     return;
   }
@@ -205,8 +248,34 @@ function normalizeManifestTarget(target: string): string | null {
   return normalized;
 }
 
+function normalizeManifestPattern(target: string): string | null {
+  if (!isSimplePattern(target) || target.trim() === "" || path.isAbsolute(target)) {
+    return null;
+  }
+
+  const normalized = normalizePackPath(path.normalize(target));
+
+  if (normalized === "." || normalized === ".." || normalized.startsWith("../")) {
+    return null;
+  }
+
+  return normalized;
+}
+
 function normalizePackPath(value: string): string {
   return value.replaceAll("\\", "/").replace(/^\.\//, "");
+}
+
+function isSimplePattern(value: string): boolean {
+  return value.split("*").length === 2;
+}
+
+function matchesPackPattern(files: Set<string>, normalizedPattern: string): boolean {
+  const starIndex = normalizedPattern.indexOf("*");
+  const prefix = normalizedPattern.slice(0, starIndex);
+  const suffix = normalizedPattern.slice(starIndex + 1);
+
+  return [...files].some((file) => file.startsWith(prefix) && file.endsWith(suffix));
 }
 
 function isSensitiveFile(file: string): boolean {

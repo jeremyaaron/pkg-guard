@@ -206,6 +206,22 @@ Acceptance criteria:
 - Common `./feature/*` export patterns receive useful validation.
 - Unsupported shapes warn without crashing.
 
+Status:
+
+- Completed on 2026-06-23.
+- Entry point checks now support simple single-star export target patterns such as `./dist/feature/*.js`.
+- Entry point pattern validation checks package containment and requires at least one matching built file.
+- Pack checks now cross-check simple export target patterns against npm pack output.
+- Complex export patterns still produce unsupported-target warnings instead of crashing.
+- Added entrypoint tests for valid patterns, missing pattern output, escaping patterns, and unsupported complex patterns.
+- Added pack tests for packed pattern matches, missing packed pattern output, and unsupported complex patterns.
+- `npm test -- tests/entrypoints.test.ts tests/pack.test.ts` passed: 19 tests across 2 test files.
+- `npm test` passed: 119 tests across 12 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed.
+
 ## Phase 6: Conservative Fix Expansion
 
 Goal: add useful fixes that remain safe and idempotent.

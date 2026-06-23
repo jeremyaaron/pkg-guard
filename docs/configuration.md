@@ -5,6 +5,7 @@
 ```json
 {
   "pkgGuard": {
+    "preset": "typescript-library",
     "ignore": ["dependencies.runtime-in-dev"],
     "strict": ["manifest.files-missing"]
   }
@@ -17,7 +18,17 @@
 | --- | --- | --- |
 | `ignore` | `string[]` | Suppresses findings by exact check ID. |
 | `strict` | `string[]` | IDs of warnings that should become errors when `--strict` is used. |
-| `preset` | `string` | Reserved for future preset support. Parsed but not used yet. |
+| `preset` | `"generic" \| "typescript-library" \| "cli"` | Overrides detected package intent. |
+
+## Presets
+
+When `preset` is omitted, `pkg-guard` infers package intent from package metadata:
+
+| Preset | How it is selected |
+| --- | --- |
+| `cli` | `package.json` defines `bin`. |
+| `typescript-library` | `tsconfig.json` exists and package entrypoint metadata such as `main`, `module`, `exports`, `types`, or `typings` is present. |
+| `generic` | No more specific preset is configured or inferred. |
 
 CLI flags are applied after package config:
 

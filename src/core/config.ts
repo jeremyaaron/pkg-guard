@@ -1,5 +1,7 @@
 import type { Finding } from "./findings.js";
-import type { PkgGuardConfig } from "./context.js";
+import type { PkgGuardConfig, PresetName } from "./context.js";
+
+const supportedPresets = new Set<PresetName>(["generic", "typescript-library", "cli"]);
 
 export interface ConfigLoadResult {
   config: PkgGuardConfig;
@@ -26,10 +28,12 @@ export function loadPkgGuardConfig(value: unknown): ConfigLoadResult {
   }
 
   if (value.preset !== undefined) {
-    if (typeof value.preset === "string" && value.preset.trim() !== "") {
-      config.preset = value.preset;
+    const preset = typeof value.preset === "string" ? value.preset.trim() : "";
+
+    if (isSupportedPreset(preset)) {
+      config.preset = preset;
     } else {
-      findings.push(invalidConfigFinding("pkgGuard.preset must be a non-empty string."));
+      findings.push(invalidConfigFinding('pkgGuard.preset must be one of "generic", "typescript-library", or "cli".'));
     }
   }
 
@@ -80,6 +84,10 @@ function invalidConfigFinding(message: string): Finding {
     file: "package.json",
     path: "$.pkgGuard"
   };
+}
+
+function isSupportedPreset(value: string): value is PresetName {
+  return supportedPresets.has(value as PresetName);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

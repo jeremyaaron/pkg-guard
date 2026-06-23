@@ -18,6 +18,19 @@ Acceptance criteria:
 
 - v0.1.2 is merged or its planned changes are intentionally carried into the v0.2.0 branch.
 
+Status:
+
+- Completed on 2026-06-22.
+- Working tree was clean before Phase 0.
+- `package.json` and `package-lock.json` are both at `0.1.2`.
+- Local `v0.1.2` tag is present.
+- `npm test` passed: 90 tests across 11 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed.
+- `npm pack --dry-run --json --ignore-scripts` passed and produced `pkg-guard-0.1.2.tgz` with the expected package contents.
+
 ## Phase 1: Preset Resolution
 
 Goal: make project intent available to checks.
@@ -39,6 +52,23 @@ Acceptance criteria:
 - `ProjectContext` includes a resolved preset.
 - Invalid configured presets emit `config.invalid`.
 - Existing config tests still pass after adjustment.
+
+Status:
+
+- Completed on 2026-06-22.
+- Added `PresetName` and `ResolvedPreset` types.
+- `ProjectContext` now includes a resolved `preset`.
+- `pkgGuard.preset` is validated against `generic`, `typescript-library`, and `cli`.
+- Discovery resolves configured presets first, then infers `cli`, then infers `typescript-library`, then defaults to `generic`.
+- Updated configuration docs with supported preset values and inference behavior.
+- Added discovery tests for configured, invalid, inferred `cli`, inferred `typescript-library`, and default `generic` presets.
+- `npm test -- tests/discovery.test.ts` passed: 15 discovery tests.
+- `npm test -- tests/discovery.test.ts tests/manifest-checks.test.ts` passed: 23 tests across 2 test files.
+- `npm test` passed: 95 tests across 11 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed.
 
 ## Phase 2: Preset-Aware Applicability
 

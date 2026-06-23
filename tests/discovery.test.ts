@@ -118,6 +118,104 @@ describe("discoverProject", () => {
     expect(result.context?.workflows[0]?.path).toBe(join(root, ".github", "workflows", "ci.yml"));
   });
 
+  it("uses a configured preset when it is supported", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "configured-preset-fixture",
+        version: "1.0.0",
+        pkgGuard: {
+          preset: "cli"
+        }
+      }
+    });
+
+    const result = await discoverProject(root);
+
+    expect(result.context?.preset).toEqual({
+      name: "cli",
+      source: "config"
+    });
+    expect(result.findings.map((finding) => finding.id)).not.toContain("config.invalid");
+  });
+
+  it("reports unsupported configured presets and falls back to inference", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "unsupported-preset-fixture",
+        version: "1.0.0",
+        bin: {
+          fixture: "./dist/cli.js"
+        },
+        pkgGuard: {
+          preset: "react-library"
+        }
+      }
+    });
+
+    const result = await discoverProject(root);
+
+    expect(result.findings.map((finding) => finding.id)).toContain("config.invalid");
+    expect(result.context?.preset).toEqual({
+      name: "cli",
+      source: "inferred"
+    });
+  });
+
+  it("infers the cli preset when bin metadata is present", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "cli-preset-fixture",
+        version: "1.0.0",
+        bin: {
+          fixture: "./dist/cli.js"
+        }
+      }
+    });
+
+    const result = await discoverProject(root);
+
+    expect(result.context?.preset).toEqual({
+      name: "cli",
+      source: "inferred"
+    });
+  });
+
+  it("infers the TypeScript library preset from tsconfig and entrypoint metadata", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "typescript-library-preset-fixture",
+        version: "1.0.0",
+        main: "./dist/index.js"
+      },
+      files: {
+        "tsconfig.json": "{}\n"
+      }
+    });
+
+    const result = await discoverProject(root);
+
+    expect(result.context?.preset).toEqual({
+      name: "typescript-library",
+      source: "inferred"
+    });
+  });
+
+  it("defaults to the generic preset when no specific package intent is detected", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "generic-preset-fixture",
+        version: "1.0.0"
+      }
+    });
+
+    const result = await discoverProject(root);
+
+    expect(result.context?.preset).toEqual({
+      name: "generic",
+      source: "default"
+    });
+  });
+
   it("reads Git remote metadata when available", async () => {
     const root = await createFixture({
       packageJson: { name: "git-fixture", version: "1.0.0" }

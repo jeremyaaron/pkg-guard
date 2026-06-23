@@ -9,11 +9,13 @@ import type { Finding } from "./findings.js";
 import type {
   GitInfo,
   LockfileInfo,
+  PackageManifest,
   PackageManagerField,
   PackageManagerInfo,
   PackageManagerName,
   PackInfo,
   ProjectContext,
+  ResolvedPreset,
   TsconfigInfo,
   WorkflowInfo
 } from "./context.js";
@@ -78,6 +80,7 @@ export async function discoverProject(cwdInput: string): Promise<ProjectDiscover
   const packageManagerField = parsePackageManagerField(manifest.data.packageManager);
   const packageManager = detectPackageManager(packageManagerField, lockfiles);
   const config = loadPkgGuardConfig(manifest.data.pkgGuard);
+  const tsconfig = await readTsconfig(root);
   const pack = await readPackInfo(root);
   const findings = [
     ...getDiscoveryFindings(packageManagerField, lockfiles),
@@ -91,8 +94,9 @@ export async function discoverProject(cwdInput: string): Promise<ProjectDiscover
       root,
       manifest,
       packageManager,
+      preset: resolvePreset(manifest.data, tsconfig, config.config.preset),
       git: await readGitInfo(root),
-      tsconfig: await readTsconfig(root),
+      tsconfig,
       workflows: await readWorkflows(root),
       pack: pack.info,
       config: config.config
@@ -224,6 +228,48 @@ function toKnownPackageManager(value: string | undefined): PackageManagerName | 
   }
 
   return null;
+}
+
+function resolvePreset(
+  manifest: PackageManifest,
+  tsconfig: TsconfigInfo | null,
+  configuredPreset: ResolvedPreset["name"] | null
+): ResolvedPreset {
+  if (configuredPreset) {
+    return {
+      name: configuredPreset,
+      source: "config"
+    };
+  }
+
+  if (manifest.bin !== undefined) {
+    return {
+      name: "cli",
+      source: "inferred"
+    };
+  }
+
+  if (tsconfig && hasLibraryEntrypoint(manifest)) {
+    return {
+      name: "typescript-library",
+      source: "inferred"
+    };
+  }
+
+  return {
+    name: "generic",
+    source: "default"
+  };
+}
+
+function hasLibraryEntrypoint(manifest: PackageManifest): boolean {
+  return (
+    manifest.main !== undefined ||
+    manifest.module !== undefined ||
+    manifest.exports !== undefined ||
+    manifest.types !== undefined ||
+    manifest.typings !== undefined
+  );
 }
 
 async function readGitInfo(root: string): Promise<GitInfo | null> {

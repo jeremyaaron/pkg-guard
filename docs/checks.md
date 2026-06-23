@@ -65,6 +65,13 @@ npx pkg-guard check --ignore dependencies.runtime-in-dev
 | `typescript.declaration-map-enabled` | warning | Declaration maps may expose source layout or local paths. |
 | `typescript.outdir-mismatch` | warning | Runtime entrypoints should normally point at generated output. |
 
+## Lifecycle Scripts
+
+| ID | Default | Rationale |
+| --- | --- | --- |
+| `lifecycle.install-script` | warning | Install-time lifecycle scripts run on consumer machines and should be intentional. |
+| `lifecycle.suspicious-install-script` | error | Install-time network, credential, or destructive shell behavior is risky for published packages. |
+
 ## Workflows
 
 Workflow validation recognizes direct GitHub Actions `run:` commands and validation commands reached through package scripts such as `npm run verify:release`, `pnpm run verify:release`, `yarn verify:release`, and `bun run verify:release`.

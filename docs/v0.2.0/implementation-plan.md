@@ -129,6 +129,22 @@ Acceptance criteria:
 - Suspicious high-confidence patterns can produce an error.
 - Private packages are handled according to the preset/applicability policy.
 
+Status:
+
+- Completed on 2026-06-22.
+- Added `src/checks/lifecycle.ts` and wired it into the check registry.
+- Added `lifecycle.install-script` warnings for `preinstall`, `install`, and `postinstall` scripts in non-private packages.
+- Added `lifecycle.suspicious-install-script` errors for high-confidence install-time network-to-shell pipes, credential references, and destructive root/home commands.
+- Private packages are skipped for lifecycle checks.
+- Documented lifecycle check IDs in `docs/checks.md`.
+- Added lifecycle tests for ordinary warnings, suspicious errors, configured ignores, private package skipping, and malformed/non-string scripts.
+- `npm test -- tests/lifecycle.test.ts` passed: 7 lifecycle tests.
+- `npm test` passed: 104 tests across 12 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed.
+
 ## Phase 4: Release Workflow Validation v2
 
 Goal: recognize common validation and publish forms without changing workflow classification.

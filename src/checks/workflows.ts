@@ -2,12 +2,13 @@ import path from "node:path";
 import { parse } from "yaml";
 
 import type { Check } from "../core/checks.js";
-import type { ProjectContext, WorkflowInfo } from "../core/context.js";
+import type { PackageManifest, ProjectContext, WorkflowInfo } from "../core/context.js";
 import type { Finding } from "../core/findings.js";
 
 interface WorkflowAnalysis {
   workflow: WorkflowInfo;
   data: Record<string, unknown>;
+  manifest: PackageManifest;
   packageScripts: Record<string, string>;
   publishSteps: string[];
   scriptInvocations: string[];
@@ -26,10 +27,10 @@ export const workflowChecks: Check[] = [
 
 function runWorkflowChecks(context: ProjectContext): Finding[] {
   const packageScripts = getPackageScripts(context.manifest.data.scripts);
-  return context.workflows.flatMap((workflow) => analyzeWorkflow(workflow, packageScripts));
+  return context.workflows.flatMap((workflow) => analyzeWorkflow(workflow, context.manifest.data, packageScripts));
 }
 
-function analyzeWorkflow(workflow: WorkflowInfo, packageScripts: Record<string, string>): Finding[] {
+function analyzeWorkflow(workflow: WorkflowInfo, manifest: PackageManifest, packageScripts: Record<string, string>): Finding[] {
   const parsed = parseWorkflow(workflow);
 
   if (!parsed.ok) {
@@ -44,7 +45,7 @@ function analyzeWorkflow(workflow: WorkflowInfo, packageScripts: Record<string, 
     ];
   }
 
-  const analysis = buildWorkflowAnalysis(workflow, parsed.data, packageScripts);
+  const analysis = buildWorkflowAnalysis(workflow, parsed.data, manifest, packageScripts);
 
   if (analysis.publishSteps.length === 0) {
     return [];
@@ -54,6 +55,8 @@ function analyzeWorkflow(workflow: WorkflowInfo, packageScripts: Record<string, 
     ...checkLongLivedNpmToken(analysis),
     ...checkOidcPermission(analysis),
     ...checkRiskyTriggers(analysis),
+    ...checkSelfHostedTrustedPublishing(analysis),
+    ...checkPublishAccess(analysis),
     ...checkRequiredPublishSteps(analysis)
   ];
 }
@@ -78,6 +81,7 @@ function parseWorkflow(workflow: WorkflowInfo): { ok: true; data: Record<string,
 function buildWorkflowAnalysis(
   workflow: WorkflowInfo,
   data: Record<string, unknown>,
+  manifest: PackageManifest,
   packageScripts: Record<string, string>
 ): WorkflowAnalysis {
   const stepRuns = collectStepRuns(data);
@@ -86,6 +90,7 @@ function buildWorkflowAnalysis(
   return {
     workflow,
     data,
+    manifest,
     packageScripts,
     stepRuns,
     scriptInvocations,
@@ -145,6 +150,58 @@ function checkRiskyTriggers(analysis: WorkflowAnalysis): Finding[] {
       suggestion: "Restrict npm publishing to version tags or another explicit release event."
     }
   ];
+}
+
+function checkSelfHostedTrustedPublishing(analysis: WorkflowAnalysis): Finding[] {
+  if (!hasIdTokenWrite(analysis.data) || !usesSelfHostedRunnerForPublishJob(analysis.data, analysis.publishSteps)) {
+    return [];
+  }
+
+  return [
+    {
+      id: "workflow.self-hosted-trusted-publishing",
+      severity: "warning",
+      title: "Trusted publishing workflow uses a self-hosted runner",
+      message: "This npm publish workflow grants id-token: write and runs a publish job on a self-hosted runner.",
+      file: relativeWorkflowPath(analysis.workflow),
+      suggestion: "Use GitHub-hosted runners for npm trusted publishing unless the self-hosted runner setup is intentionally trusted."
+    }
+  ];
+}
+
+function checkPublishAccess(analysis: WorkflowAnalysis): Finding[] {
+  const expectedAccess = getExpectedPublishAccess(analysis.manifest);
+
+  if (!expectedAccess) {
+    return [];
+  }
+
+  return analysis.publishSteps.flatMap((publishStep) => {
+    if (!/\bnpm\s+publish\b/.test(normalizeCommand(publishStep))) {
+      return [];
+    }
+
+    const actualAccess = getPublishAccess(publishStep);
+
+    if (actualAccess === expectedAccess) {
+      return [];
+    }
+
+    const id = actualAccess ? "workflow.publish-access-mismatch" : "workflow.publish-access-missing";
+
+    return [
+      {
+        id,
+        severity: "warning" as const,
+        title: actualAccess ? "Publish workflow uses unexpected npm access" : "Publish workflow is missing npm access",
+        message: actualAccess
+          ? `This npm publish workflow uses --access ${actualAccess}, but package metadata expects ${expectedAccess}.`
+          : `This npm publish workflow should use --access ${expectedAccess}.`,
+        file: relativeWorkflowPath(analysis.workflow),
+        suggestion: `Publish with npm publish --access ${expectedAccess}, or update package.json publishConfig.access if that is not intended.`
+      }
+    ];
+  });
 }
 
 function checkRequiredPublishSteps(analysis: WorkflowAnalysis): Finding[] {
@@ -245,6 +302,28 @@ function hasJobPermission(data: Record<string, unknown>, key: string): boolean {
   return Object.values(data.jobs).some((job) => isRecord(job) && hasPermission(job.permissions, key));
 }
 
+function usesSelfHostedRunnerForPublishJob(data: Record<string, unknown>, publishSteps: string[]): boolean {
+  if (!isRecord(data.jobs)) {
+    return false;
+  }
+
+  return Object.values(data.jobs).some((job) => {
+    if (!isRecord(job) || !runsOnSelfHosted(job["runs-on"]) || !Array.isArray(job.steps)) {
+      return false;
+    }
+
+    return job.steps.some((step) => isRecord(step) && typeof step.run === "string" && publishSteps.includes(step.run));
+  });
+}
+
+function runsOnSelfHosted(value: unknown): boolean {
+  if (typeof value === "string") {
+    return value === "self-hosted";
+  }
+
+  return Array.isArray(value) && value.some((item) => item === "self-hosted");
+}
+
 function publishesOnOrdinaryBranchPush(data: Record<string, unknown>): boolean {
   const trigger = data.on;
 
@@ -308,6 +387,32 @@ function hasPackageValidationStep(commands: string[]): boolean {
     const normalized = normalizeCommand(command);
     return /\bpkg-guard\s+check\b/.test(normalized) || /\bnpm\s+pack\b.*(?:^|\s)--dry-run(?:\s|$)/.test(normalized);
   });
+}
+
+function getExpectedPublishAccess(manifest: PackageManifest): "public" | "restricted" | null {
+  const configuredAccess = getPublishConfigAccess(manifest.publishConfig);
+
+  if (configuredAccess) {
+    return configuredAccess;
+  }
+
+  return typeof manifest.name === "string" && manifest.name.startsWith("@") ? "public" : null;
+}
+
+function getPublishConfigAccess(value: unknown): "public" | "restricted" | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return value.access === "public" || value.access === "restricted" ? value.access : null;
+}
+
+function getPublishAccess(command: string): "public" | "restricted" | null {
+  const normalized = normalizeCommand(command);
+  const match = /\bnpm\s+publish\b.*(?:^|\s)--access(?:=|\s+)(public|restricted)(?:\s|$)/.exec(normalized);
+  const access = match?.[1];
+
+  return access === "public" || access === "restricted" ? access : null;
 }
 
 function normalizeCommand(command: string): string {

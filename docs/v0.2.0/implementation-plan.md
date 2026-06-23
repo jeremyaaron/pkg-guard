@@ -167,6 +167,23 @@ Acceptance criteria:
 - New validation command forms satisfy package validation checks.
 - Scoped package publish access warnings are stable and documented.
 
+Status:
+
+- Completed on 2026-06-22.
+- Package validation detection now has tests for `npm exec pkg-guard check`, `pnpm dlx pkg-guard check`, `yarn dlx pkg-guard check`, and `bunx pkg-guard check`.
+- Added script-expanded workflow coverage for package-manager `dlx` validation forms.
+- Added `workflow.publish-access-missing` for scoped packages that publish without explicit npm access.
+- Added `workflow.publish-access-mismatch` when `publishConfig.access` conflicts with an obvious workflow publish flag.
+- Added `workflow.self-hosted-trusted-publishing` when an OIDC npm publish job runs on a self-hosted runner.
+- Documented the new workflow check IDs in `docs/checks.md`.
+- Publish workflow classification still uses direct workflow publish commands, not scripted `npm publish`.
+- `npm test -- tests/workflows.test.ts` passed: 25 workflow tests.
+- `npm test` passed: 113 tests across 12 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed.
+
 ## Phase 5: Entrypoint Pattern and Pack Checks
 
 Goal: improve modern `exports` validation.

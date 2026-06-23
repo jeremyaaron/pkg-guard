@@ -25,6 +25,10 @@ function runEntrypointChecks(context: ProjectContext): Finding[] {
   const findings: Finding[] = [];
   const declared = collectDeclaredEntryPoints(context, findings);
 
+  if (context.preset.name === "cli" && !hasUsableBinTarget(context.manifest.data.bin)) {
+    findings.push(missingCliBinFinding());
+  }
+
   for (const entrypoint of declared) {
     findings.push(...validateEntryPoint(context, entrypoint));
   }
@@ -106,6 +110,30 @@ function collectBinTargets(declared: DeclaredEntryPoint[], findings: Finding[], 
   }
 
   findings.push(unsupportedTargetFinding("bin", "$.bin", "bin must be a string or an object of command targets."));
+}
+
+function hasUsableBinTarget(value: unknown): boolean {
+  if (typeof value === "string") {
+    return value.trim() !== "";
+  }
+
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return Object.values(value).some((target) => typeof target === "string" && target.trim() !== "");
+}
+
+function missingCliBinFinding(): Finding {
+  return {
+    id: "entrypoint.target-missing",
+    severity: "error",
+    title: "CLI package is missing a bin entry point",
+    message: "The cli preset requires package.json to define at least one bin target.",
+    file: "package.json",
+    path: "$.bin",
+    suggestion: "Add a bin entry that points at the built CLI file."
+  };
 }
 
 function collectExportTargets(declared: DeclaredEntryPoint[], findings: Finding[], value: unknown): void {

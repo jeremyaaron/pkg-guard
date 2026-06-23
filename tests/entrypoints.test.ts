@@ -56,6 +56,24 @@ describe("entrypoint checks", () => {
     expect(findings.map((finding) => finding.id)).toContain("entrypoint.bin-shebang-missing");
   });
 
+  it("reports a missing bin target for the cli preset", async () => {
+    const root = await createFixture({
+      packageJson: basePackage({
+        pkgGuard: {
+          preset: "cli"
+        }
+      })
+    });
+
+    const findings = await getCheckFindings(root);
+    const finding = findings.find((item) => item.id === "entrypoint.target-missing" && item.path === "$.bin");
+
+    expect(finding).toMatchObject({
+      severity: "error",
+      title: "CLI package is missing a bin entry point"
+    });
+  });
+
   it("warns on unsupported export shapes without crashing", async () => {
     const root = await createFixture({
       packageJson: basePackage({

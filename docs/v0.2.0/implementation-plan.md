@@ -90,6 +90,23 @@ Acceptance criteria:
 - CLI packages do not receive irrelevant TypeScript-library declaration warnings.
 - CLI packages still receive bin target and shebang errors.
 
+Status:
+
+- Completed on 2026-06-22.
+- TypeScript declaration-focused checks now run only for the resolved `typescript-library` preset.
+- Source `types` metadata checks and invalid/extended `tsconfig` checks remain independent of library preset applicability.
+- The `cli` preset now requires at least one usable `bin` target and reports the existing `entrypoint.target-missing` ID when missing.
+- Existing bin target and shebang validation still applies to CLI packages.
+- Added TypeScript fixture coverage proving the `cli` preset avoids library declaration, declaration-map, and outDir warnings.
+- Added entrypoint fixture coverage for configured CLI packages without `bin`.
+- `npm test -- tests/typescript.test.ts tests/entrypoints.test.ts` passed: 16 tests across 2 test files.
+- `npm test -- tests/pack.test.ts tests/typescript.test.ts tests/entrypoints.test.ts` passed: 20 tests across 3 test files.
+- `npm test` passed: 97 tests across 11 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed.
+
 ## Phase 3: Lifecycle Script Checks
 
 Goal: cover a supply-chain risk called out in the original MVP.

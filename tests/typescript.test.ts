@@ -140,6 +140,37 @@ describe("TypeScript checks", () => {
 
     expect(findings.map((finding) => finding.id)).not.toContain("typescript.declaration-missing");
   });
+
+  it("does not apply library declaration checks to the cli preset", async () => {
+    const root = await createFixture({
+      packageJson: basePackage({
+        main: "./dist/index.js",
+        bin: {
+          fixture: "./dist/cli.js"
+        },
+        pkgGuard: {
+          preset: "cli"
+        }
+      }),
+      tsconfig: {
+        compilerOptions: {
+          declarationMap: true,
+          outDir: "lib"
+        }
+      },
+      files: {
+        "dist/index.js": "export {};\n",
+        "dist/cli.js": "#!/usr/bin/env node\nconsole.log('hello');\n"
+      }
+    });
+
+    const findings = await getCheckFindings(root);
+    const ids = findings.map((finding) => finding.id);
+
+    expect(ids).not.toContain("typescript.declaration-missing");
+    expect(ids).not.toContain("typescript.declaration-map-enabled");
+    expect(ids).not.toContain("typescript.outdir-mismatch");
+  });
 });
 
 function basePackage(overrides: Record<string, unknown>): Record<string, unknown> {

@@ -33,6 +33,9 @@ export interface PackageManifest {
   exports?: unknown;
   bin?: unknown;
   files?: unknown;
+  engines?: unknown;
+  publishConfig?: unknown;
+  sideEffects?: unknown;
   dependencies?: unknown;
   devDependencies?: unknown;
   peerDependencies?: unknown;

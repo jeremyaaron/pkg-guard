@@ -48,6 +48,14 @@ For downstream projects that install `pkg-guard` from npm:
 }
 ```
 
+## Preview Metadata Fixes
+
+```sh
+npx pkg-guard fix --dry-run
+```
+
+`fix` only writes conservative `package.json` metadata changes, such as detected package manager, repository metadata, `types`, `files`, scoped package access, inferred Node engines, and low-risk `sideEffects`.
+
 ## Promote a Warning in Strict Mode
 
 ```json

@@ -23,7 +23,7 @@ npx pkg-guard init-release
 
 `check` is read-only and exits with `1` when errors are found. Warnings do not fail the command unless promoted through strict config.
 
-`fix` applies only conservative `package.json` metadata fixes. Use `--dry-run` to preview changes.
+`fix` applies only conservative `package.json` metadata fixes such as `packageManager`, repository metadata, `types`, `files`, scoped package access, inferred Node engines, and low-risk `sideEffects`. Use `--dry-run` to preview changes.
 
 `init-release` creates `.github/workflows/release.yml` for npm trusted publishing and refuses to overwrite an existing release workflow.
 

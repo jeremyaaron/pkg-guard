@@ -32,6 +32,8 @@ npx pkg-guard check --ignore dependencies.runtime-in-dev
 | `manifest.repository-missing` | warning | Repository metadata improves package traceability. |
 | `manifest.files-missing` | warning | Unconstrained packlists can publish unintended files. |
 | `manifest.types-missing` | warning | Generated declarations should be exposed through package type metadata. |
+| `manifest.publish-access-missing` | warning | Scoped packages should declare npm publish access explicitly. |
+| `manifest.engines-node-missing` | warning | Runtime Node support should be exposed when it can be inferred safely. |
 | `manifest.private-publishable` | warning | `private: true` conflicts with publish-oriented metadata. |
 
 ## Entry Points

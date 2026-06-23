@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { access, writeFile } from "node:fs/promises";
+import { access, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
@@ -72,6 +72,30 @@ export async function planFixes(context: ProjectContext, findings: readonly Find
   if (await canApplyTypesFix(context)) {
     const typesPlan = planTypesFix();
     plans.push(typesPlan);
+  }
+
+  const filesPlan = await planFilesFix(context, findingIds);
+
+  if (filesPlan) {
+    plans.push(filesPlan);
+  }
+
+  const publishAccessPlan = planPublishAccessFix(context, findingIds);
+
+  if (publishAccessPlan) {
+    plans.push(publishAccessPlan);
+  }
+
+  const enginesNodePlan = planEnginesNodeFix(context, findingIds);
+
+  if (enginesNodePlan) {
+    plans.push(enginesNodePlan);
+  }
+
+  const sideEffectsPlan = planSideEffectsFix(context, findingIds);
+
+  if (sideEffectsPlan) {
+    plans.push(sideEffectsPlan);
   }
 
   return plans.filter((plan) => plan.operations.length > 0);
@@ -277,6 +301,225 @@ export async function canApplyTypesFix(context: ProjectContext): Promise<boolean
   } catch {
     return false;
   }
+}
+
+async function planFilesFix(context: ProjectContext, findingIds: ReadonlySet<string>): Promise<FixPlan | null> {
+  if (!findingIds.has("manifest.files-missing") || context.manifest.data.files !== undefined) {
+    return null;
+  }
+
+  if (!(await isDirectory(path.join(context.root, "dist")))) {
+    return null;
+  }
+
+  const files = ["dist"];
+
+  if (await fileExists(path.join(context.root, "README.md"))) {
+    files.push("README.md");
+  }
+
+  if (await fileExists(path.join(context.root, "LICENSE"))) {
+    files.push("LICENSE");
+  }
+
+  return {
+    id: "fix.files",
+    findingId: "manifest.files-missing",
+    description: `Add package files ${formatJsonList(files)} to package.json.`,
+    operations: [
+      {
+        kind: "json-set",
+        file: "package.json",
+        path: "$.files",
+        key: "files",
+        value: files
+      }
+    ]
+  };
+}
+
+function planPublishAccessFix(context: ProjectContext, findingIds: ReadonlySet<string>): FixPlan | null {
+  const manifest = context.manifest.data;
+
+  if (!findingIds.has("manifest.publish-access-missing") || manifest.private === true || getPublishAccess(manifest.publishConfig)) {
+    return null;
+  }
+
+  if (typeof manifest.name !== "string" || !manifest.name.startsWith("@")) {
+    return null;
+  }
+
+  const publishConfig = isRecord(manifest.publishConfig) ? { ...manifest.publishConfig, access: "public" } : { access: "public" };
+
+  return {
+    id: "fix.publish-access",
+    findingId: "manifest.publish-access-missing",
+    description: 'Add publishConfig.access "public" for this scoped package.',
+    operations: [
+      {
+        kind: "json-set",
+        file: "package.json",
+        path: "$.publishConfig.access",
+        key: "publishConfig",
+        value: publishConfig
+      }
+    ]
+  };
+}
+
+function planEnginesNodeFix(context: ProjectContext, findingIds: ReadonlySet<string>): FixPlan | null {
+  if (!findingIds.has("manifest.engines-node-missing") || hasNodeEngine(context.manifest.data.engines)) {
+    return null;
+  }
+
+  const nodeRange = inferNodeEngineRange(context);
+
+  if (!nodeRange || (context.manifest.data.engines !== undefined && !isRecord(context.manifest.data.engines))) {
+    return null;
+  }
+
+  const engines = isRecord(context.manifest.data.engines) ? { ...context.manifest.data.engines, node: nodeRange } : { node: nodeRange };
+
+  return {
+    id: "fix.engines-node",
+    findingId: "manifest.engines-node-missing",
+    description: `Add engines.node "${nodeRange}" inferred from TypeScript target.`,
+    operations: [
+      {
+        kind: "json-set",
+        file: "package.json",
+        path: "$.engines.node",
+        key: "engines",
+        value: engines
+      }
+    ]
+  };
+}
+
+function planSideEffectsFix(context: ProjectContext, findingIds: ReadonlySet<string>): FixPlan | null {
+  if (
+    context.manifest.data.private === true ||
+    context.manifest.data.sideEffects !== undefined ||
+    context.preset.name !== "typescript-library" ||
+    !appearsToHaveRuntimeEntrypoint(context.manifest.data) ||
+    hasInstallLifecycleScript(context.manifest.data.scripts) ||
+    hasKnownSideEffectFile(context)
+  ) {
+    return null;
+  }
+
+  return {
+    id: "fix.side-effects",
+    findingId: findingIds.has("manifest.files-missing") ? "manifest.files-missing" : "manifest.side-effects-missing",
+    description: "Add sideEffects false for this package.",
+    operations: [
+      {
+        kind: "json-set",
+        file: "package.json",
+        path: "$.sideEffects",
+        key: "sideEffects",
+        value: false
+      }
+    ]
+  };
+}
+
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    const fileStat = await stat(filePath);
+    return fileStat.isFile();
+  } catch {
+    return false;
+  }
+}
+
+async function isDirectory(filePath: string): Promise<boolean> {
+  try {
+    const fileStat = await stat(filePath);
+    return fileStat.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function getPublishAccess(value: unknown): "public" | "restricted" | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return value.access === "public" || value.access === "restricted" ? value.access : null;
+}
+
+function hasNodeEngine(value: unknown): boolean {
+  return isRecord(value) && typeof value.node === "string" && value.node.trim() !== "";
+}
+
+function inferNodeEngineRange(context: ProjectContext): string | null {
+  const tsconfig = context.tsconfig?.data;
+
+  if (!isRecord(tsconfig) || !isRecord(tsconfig.compilerOptions)) {
+    return null;
+  }
+
+  const target = tsconfig.compilerOptions.target;
+
+  if (typeof target !== "string") {
+    return null;
+  }
+
+  return nodeRangeForTsTarget(target);
+}
+
+function nodeRangeForTsTarget(target: string): string | null {
+  const normalized = target.toLowerCase();
+
+  if (normalized === "es2022" || normalized === "esnext") {
+    return ">=18.0.0";
+  }
+
+  if (normalized === "es2021") {
+    return ">=16.0.0";
+  }
+
+  if (normalized === "es2020") {
+    return ">=14.0.0";
+  }
+
+  return null;
+}
+
+function appearsToHaveRuntimeEntrypoint(manifest: PackageManifest): boolean {
+  return manifest.main !== undefined || manifest.module !== undefined || manifest.exports !== undefined;
+}
+
+function hasInstallLifecycleScript(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return ["preinstall", "install", "postinstall"].some((scriptName) => typeof value[scriptName] === "string");
+}
+
+function hasKnownSideEffectFile(context: ProjectContext): boolean {
+  const files = context.pack?.files.map((file) => file.path.toLowerCase()) ?? [];
+
+  return files.some((file) =>
+    (
+      file.endsWith(".css") ||
+      file.endsWith(".scss") ||
+      file.endsWith(".sass") ||
+      file.endsWith(".less") ||
+      /(?:^|\/)(?:polyfill|register|setup|global)\.[cm]?js$/.test(file)
+    )
+  );
+}
+
+function formatJsonList(values: string[]): string {
+  return values.map((value) => JSON.stringify(value)).join(", ");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function applyPackageJsonOperations(raw: string, operations: readonly JsonSetOperation[]): string {

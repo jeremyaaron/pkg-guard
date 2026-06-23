@@ -245,6 +245,24 @@ Acceptance criteria:
 - Running `fix` twice produces no second diff.
 - `fix --json` remains schema-compatible.
 
+Status:
+
+- Completed on 2026-06-23.
+- Added conservative fix plans for `files`, `publishConfig.access`, `engines.node`, and `sideEffects: false`.
+- `fix.files` applies when `manifest.files-missing` is present and a `dist` directory exists.
+- `fix.publish-access` applies to scoped non-private packages missing `publishConfig.access`.
+- `fix.engines-node` applies when `manifest.engines-node-missing` is inferred from TypeScript target metadata.
+- `fix.side-effects` applies only to simple TypeScript-library packages without known side-effect files or install-time lifecycle scripts.
+- Added `manifest.publish-access-missing` and `manifest.engines-node-missing` check IDs to support stable fix metadata.
+- Updated README, examples, and check ID docs for the expanded fix coverage.
+- Added dry-run/schema and idempotency tests for the expanded fixes.
+- `npm test -- tests/fixes.test.ts tests/manifest-checks.test.ts` passed: 23 tests across 2 test files.
+- `npm test` passed: 126 tests across 12 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed.
+
 ## Phase 7: Public Docs and Examples
 
 Goal: make v0.2.0 understandable to users.

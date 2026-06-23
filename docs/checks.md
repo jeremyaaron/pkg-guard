@@ -76,7 +76,7 @@ npx pkg-guard check --ignore dependencies.runtime-in-dev
 
 ## Workflows
 
-Workflow validation recognizes direct GitHub Actions `run:` commands and validation commands reached through package scripts such as `npm run verify:release`, `pnpm run verify:release`, `yarn verify:release`, and `bun run verify:release`.
+Workflow validation recognizes direct GitHub Actions `run:` commands and validation commands reached through package scripts such as `npm run verify:release`, `pnpm run verify:release`, `yarn verify:release`, and `bun run verify:release`. Direct validation commands can use `npx`, `npm exec`, `pnpm dlx`, `yarn dlx`, or `bunx`.
 
 | ID | Default | Rationale |
 | --- | --- | --- |

@@ -34,11 +34,14 @@ Optional config lives in `package.json`:
 ```json
 {
   "pkgGuard": {
+    "preset": "typescript-library",
     "ignore": ["dependencies.runtime-in-dev"],
     "strict": ["manifest.files-missing"]
   }
 }
 ```
+
+`pkg-guard` infers `cli`, `typescript-library`, or `generic` from package metadata. Configure `preset` when the inferred intent is too broad or too narrow for the package.
 
 See [configuration](docs/configuration.md) and [check IDs](docs/checks.md).
 

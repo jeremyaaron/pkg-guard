@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta
       name="description"
-      content="pkg-guard is a TypeScript CLI that checks npm package manifests, entrypoints, tarballs, and release workflows before publishing."
+      content="pkg-guard is a TypeScript CLI that checks npm package manifests, entrypoints, tarballs, lifecycle scripts, and release workflows before publishing."
     >
     <title>pkg-guard | npm package publishing hygiene</title>
     <link rel="stylesheet" href="styles.css">
@@ -33,7 +33,7 @@
           <p class="hero-copy">
             <span>Find broken entrypoints.</span>
             <span>Catch bad tarballs.</span>
-            <span>Block unsafe npm release workflows.</span>
+            <span>Review lifecycle scripts and release workflows.</span>
           </p>
           <div class="hero-actions" aria-label="Primary actions">
             <a class="button button-primary" href="#install">Install</a>
@@ -52,7 +52,7 @@
           <span class="signal-label">CLI command in CI</span>
         </div>
         <div class="signal">
-          <span class="signal-value">6</span>
+          <span class="signal-value">7</span>
           <span class="signal-label">publish surfaces checked</span>
         </div>
       </section>
@@ -62,19 +62,19 @@
           <p class="eyebrow">Checks</p>
           <h2 id="checks-title">A practical preflight for package releases.</h2>
           <p>
-            `pkg-guard check` inspects the files and metadata that consumers actually rely on: the manifest, declared entrypoints, packed tarball contents, TypeScript declarations, dependency ranges, and npm publish workflows.
+            `pkg-guard check` inspects the files and metadata that consumers actually rely on: the manifest, declared entrypoints, packed tarball contents, lifecycle scripts, TypeScript declarations, dependency ranges, and npm publish workflows.
           </p>
         </div>
         <div class="feature-grid">
           <article class="feature">
             <span class="feature-kicker">Manifest</span>
             <h3>Package metadata that resolves cleanly.</h3>
-            <p>Validate names, versions, licenses, repository links, package managers, and publish-oriented fields.</p>
+            <p>Validate names, versions, licenses, repository links, package managers, scoped publish access, and publish-oriented fields.</p>
           </article>
           <article class="feature">
             <span class="feature-kicker">Entrypoints</span>
             <h3>Imports and binaries that exist.</h3>
-            <p>Check `main`, `types`, `exports`, and `bin` targets before a consumer finds the broken path.</p>
+            <p>Check `main`, `types`, `exports`, and `bin` targets, including common export patterns, before a consumer finds the broken path.</p>
           </article>
           <article class="feature">
             <span class="feature-kicker">Packlist</span>
@@ -82,9 +82,9 @@
             <p>Use npm pack inspection to detect missing files, junk artifacts, and sensitive files in publish output.</p>
           </article>
           <article class="feature">
-            <span class="feature-kicker">Release</span>
-            <h3>Workflow defaults that favor OIDC.</h3>
-            <p>Warn on long-lived npm tokens, missing `id-token: write`, unsafe triggers, and missing validation steps.</p>
+            <span class="feature-kicker">Intent</span>
+            <h3>Checks shaped to the package.</h3>
+            <p>Infer CLI, TypeScript library, or generic intent so package-specific findings stay useful and suppressible.</p>
           </article>
         </div>
       </section>
@@ -104,6 +104,7 @@
               <li><span class="ok"></span> manifest metadata</li>
               <li><span class="ok"></span> entrypoint targets</li>
               <li><span class="ok"></span> packed package contents</li>
+              <li><span class="ok"></span> lifecycle scripts</li>
               <li><span class="ok"></span> declaration settings</li>
               <li><span class="ok"></span> release workflow posture</li>
             </ol>

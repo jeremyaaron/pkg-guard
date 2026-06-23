@@ -278,6 +278,19 @@ Acceptance criteria:
 - Docs explain what changed and how to suppress intentional findings.
 - Docs avoid exposing internal implementation details.
 
+Status:
+
+- Completed on 2026-06-23.
+- Added a `0.2.0` changelog entry covering preset behavior, lifecycle checks, workflow validation, export pattern support, and expanded fixes.
+- Updated README configuration examples with `pkgGuard.preset` and short preset override guidance.
+- Updated check, examples, and release workflow docs for broader validation command recognition, intentional lifecycle suppressions, preset overrides, and scoped publish access workflow warnings.
+- Reviewed `/site` and refreshed the product site copy for lifecycle checks, preset-shaped findings, export pattern support, scoped publish access, and the updated checked-surface count.
+- `npm test` passed: 126 tests across 12 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed.
+
 ## Phase 8: Final Verification
 
 Goal: prepare v0.2.0 for release.

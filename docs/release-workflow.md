@@ -50,3 +50,5 @@ The publish step always uses the npm CLI because npm trusted publishing is tied 
 | Scoped package without `publishConfig.access` | `npm publish --access public` |
 | `publishConfig.access: "public"` | `npm publish --access public` |
 | `publishConfig.access: "restricted"` | `npm publish --access restricted` |
+
+Workflow checks also compare obvious publish access flags with `publishConfig.access` and warn when scoped packages publish without explicit access.

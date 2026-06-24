@@ -311,3 +311,15 @@ Acceptance criteria:
 - Full verification passes.
 - Packed output is clean.
 - The release notes map directly to implemented user-facing behavior.
+
+Status:
+
+- Completed on 2026-06-24.
+- Updated `package.json` and `package-lock.json` from `0.1.2` to `0.2.0`.
+- Confirmed the `0.2.0` changelog maps to implemented behavior: active presets, preset-aware applicability, lifecycle checks, workflow validation updates, export pattern support, and expanded conservative fixes.
+- `npm test` passed: 126 tests across 12 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed.
+- `npm pack --dry-run --json --ignore-scripts` passed and produced `pkg-guard-0.2.0.tgz` with 104 entries, no bundled dependencies, and the CLI bin emitted as executable.

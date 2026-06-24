@@ -3,6 +3,7 @@ export interface ProjectContext {
   root: string;
   manifest: PackageManifestFile;
   packageManager: PackageManagerInfo;
+  preset: ResolvedPreset;
   git: GitInfo | null;
   tsconfig: TsconfigInfo | null;
   workflows: WorkflowInfo[];
@@ -32,6 +33,9 @@ export interface PackageManifest {
   exports?: unknown;
   bin?: unknown;
   files?: unknown;
+  engines?: unknown;
+  publishConfig?: unknown;
+  sideEffects?: unknown;
   dependencies?: unknown;
   devDependencies?: unknown;
   peerDependencies?: unknown;
@@ -42,9 +46,16 @@ export interface PackageManifest {
 }
 
 export interface PkgGuardConfig {
-  preset: string | null;
+  preset: PresetName | null;
   ignore: string[];
   strict: string[];
+}
+
+export type PresetName = "generic" | "typescript-library" | "cli";
+
+export interface ResolvedPreset {
+  name: PresetName;
+  source: "config" | "inferred" | "default";
 }
 
 export type PackageManagerName = "npm" | "pnpm" | "yarn" | "bun";

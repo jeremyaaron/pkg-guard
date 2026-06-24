@@ -56,12 +56,30 @@ describe("entrypoint checks", () => {
     expect(findings.map((finding) => finding.id)).toContain("entrypoint.bin-shebang-missing");
   });
 
+  it("reports a missing bin target for the cli preset", async () => {
+    const root = await createFixture({
+      packageJson: basePackage({
+        pkgGuard: {
+          preset: "cli"
+        }
+      })
+    });
+
+    const findings = await getCheckFindings(root);
+    const finding = findings.find((item) => item.id === "entrypoint.target-missing" && item.path === "$.bin");
+
+    expect(finding).toMatchObject({
+      severity: "error",
+      title: "CLI package is missing a bin entry point"
+    });
+  });
+
   it("warns on unsupported export shapes without crashing", async () => {
     const root = await createFixture({
       packageJson: basePackage({
         exports: {
           ".": ["./dist/index.js"],
-          "./feature/*": "./dist/feature/*.js"
+          "./feature/**": "./dist/feature/**/*.js"
         }
       })
     });
@@ -69,6 +87,62 @@ describe("entrypoint checks", () => {
     const findings = await getCheckFindings(root);
 
     expect(findings.filter((finding) => finding.id === "entrypoint.unsupported-target")).toHaveLength(2);
+  });
+
+  it("passes when an export pattern matches built files", async () => {
+    const root = await createFixture({
+      packageJson: basePackage({
+        exports: {
+          "./feature/*": "./dist/feature/*.js"
+        }
+      }),
+      files: {
+        "dist/feature/alpha.js": "export {};\n"
+      }
+    });
+
+    const findings = await getCheckFindings(root);
+
+    expect(findings.map((finding) => finding.id)).not.toContain("entrypoint.target-missing");
+    expect(findings.map((finding) => finding.id)).not.toContain("entrypoint.unsupported-target");
+  });
+
+  it("reports export patterns that do not match built files", async () => {
+    const root = await createFixture({
+      packageJson: basePackage({
+        exports: {
+          "./feature/*": "./dist/feature/*.js"
+        }
+      }),
+      files: {
+        "dist/feature/alpha.d.ts": "export {};\n"
+      }
+    });
+
+    const findings = await getCheckFindings(root);
+    const finding = findings.find((item) => item.id === "entrypoint.target-missing" && item.path === '$.exports."./feature/*"');
+
+    expect(finding).toMatchObject({
+      severity: "error",
+      title: "Entry point pattern does not match files"
+    });
+  });
+
+  it("reports export patterns that escape the package root", async () => {
+    const root = await createFixture({
+      packageJson: basePackage({
+        exports: {
+          "./feature/*": "../dist/feature/*.js"
+        }
+      })
+    });
+
+    const findings = await getCheckFindings(root);
+    const finding = findings.find((item) => item.id === "entrypoint.target-escapes-package" && item.path === '$.exports."./feature/*"');
+
+    expect(finding).toMatchObject({
+      severity: "error"
+    });
   });
 
   it("passes a valid simple ESM TypeScript library fixture", async () => {

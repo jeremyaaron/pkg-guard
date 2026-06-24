@@ -162,13 +162,7 @@ function appearsToBeTypeScriptLibrary(context: ProjectContext): boolean {
     return false;
   }
 
-  return (
-    manifest.main !== undefined ||
-    manifest.module !== undefined ||
-    manifest.exports !== undefined ||
-    manifest.types !== undefined ||
-    manifest.typings !== undefined
-  );
+  return context.preset.name === "typescript-library";
 }
 
 function collectRuntimeTargets(manifest: PackageManifest): DeclaredRuntimeTarget[] {

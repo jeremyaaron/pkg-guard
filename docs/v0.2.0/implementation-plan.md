@@ -18,6 +18,19 @@ Acceptance criteria:
 
 - v0.1.2 is merged or its planned changes are intentionally carried into the v0.2.0 branch.
 
+Status:
+
+- Completed on 2026-06-22.
+- Working tree was clean before Phase 0.
+- `package.json` and `package-lock.json` are both at `0.1.2`.
+- Local `v0.1.2` tag is present.
+- `npm test` passed: 90 tests across 11 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed.
+- `npm pack --dry-run --json --ignore-scripts` passed and produced `pkg-guard-0.1.2.tgz` with the expected package contents.
+
 ## Phase 1: Preset Resolution
 
 Goal: make project intent available to checks.
@@ -40,6 +53,23 @@ Acceptance criteria:
 - Invalid configured presets emit `config.invalid`.
 - Existing config tests still pass after adjustment.
 
+Status:
+
+- Completed on 2026-06-22.
+- Added `PresetName` and `ResolvedPreset` types.
+- `ProjectContext` now includes a resolved `preset`.
+- `pkgGuard.preset` is validated against `generic`, `typescript-library`, and `cli`.
+- Discovery resolves configured presets first, then infers `cli`, then infers `typescript-library`, then defaults to `generic`.
+- Updated configuration docs with supported preset values and inference behavior.
+- Added discovery tests for configured, invalid, inferred `cli`, inferred `typescript-library`, and default `generic` presets.
+- `npm test -- tests/discovery.test.ts` passed: 15 discovery tests.
+- `npm test -- tests/discovery.test.ts tests/manifest-checks.test.ts` passed: 23 tests across 2 test files.
+- `npm test` passed: 95 tests across 11 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed.
+
 ## Phase 2: Preset-Aware Applicability
 
 Goal: reduce noisy checks before adding new ones.
@@ -59,6 +89,23 @@ Acceptance criteria:
 
 - CLI packages do not receive irrelevant TypeScript-library declaration warnings.
 - CLI packages still receive bin target and shebang errors.
+
+Status:
+
+- Completed on 2026-06-22.
+- TypeScript declaration-focused checks now run only for the resolved `typescript-library` preset.
+- Source `types` metadata checks and invalid/extended `tsconfig` checks remain independent of library preset applicability.
+- The `cli` preset now requires at least one usable `bin` target and reports the existing `entrypoint.target-missing` ID when missing.
+- Existing bin target and shebang validation still applies to CLI packages.
+- Added TypeScript fixture coverage proving the `cli` preset avoids library declaration, declaration-map, and outDir warnings.
+- Added entrypoint fixture coverage for configured CLI packages without `bin`.
+- `npm test -- tests/typescript.test.ts tests/entrypoints.test.ts` passed: 16 tests across 2 test files.
+- `npm test -- tests/pack.test.ts tests/typescript.test.ts tests/entrypoints.test.ts` passed: 20 tests across 3 test files.
+- `npm test` passed: 97 tests across 11 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed.
 
 ## Phase 3: Lifecycle Script Checks
 
@@ -82,6 +129,22 @@ Acceptance criteria:
 - Suspicious high-confidence patterns can produce an error.
 - Private packages are handled according to the preset/applicability policy.
 
+Status:
+
+- Completed on 2026-06-22.
+- Added `src/checks/lifecycle.ts` and wired it into the check registry.
+- Added `lifecycle.install-script` warnings for `preinstall`, `install`, and `postinstall` scripts in non-private packages.
+- Added `lifecycle.suspicious-install-script` errors for high-confidence install-time network-to-shell pipes, credential references, and destructive root/home commands.
+- Private packages are skipped for lifecycle checks.
+- Documented lifecycle check IDs in `docs/checks.md`.
+- Added lifecycle tests for ordinary warnings, suspicious errors, configured ignores, private package skipping, and malformed/non-string scripts.
+- `npm test -- tests/lifecycle.test.ts` passed: 7 lifecycle tests.
+- `npm test` passed: 104 tests across 12 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed.
+
 ## Phase 4: Release Workflow Validation v2
 
 Goal: recognize common validation and publish forms without changing workflow classification.
@@ -104,6 +167,23 @@ Acceptance criteria:
 - New validation command forms satisfy package validation checks.
 - Scoped package publish access warnings are stable and documented.
 
+Status:
+
+- Completed on 2026-06-22.
+- Package validation detection now has tests for `npm exec pkg-guard check`, `pnpm dlx pkg-guard check`, `yarn dlx pkg-guard check`, and `bunx pkg-guard check`.
+- Added script-expanded workflow coverage for package-manager `dlx` validation forms.
+- Added `workflow.publish-access-missing` for scoped packages that publish without explicit npm access.
+- Added `workflow.publish-access-mismatch` when `publishConfig.access` conflicts with an obvious workflow publish flag.
+- Added `workflow.self-hosted-trusted-publishing` when an OIDC npm publish job runs on a self-hosted runner.
+- Documented the new workflow check IDs in `docs/checks.md`.
+- Publish workflow classification still uses direct workflow publish commands, not scripted `npm publish`.
+- `npm test -- tests/workflows.test.ts` passed: 25 workflow tests.
+- `npm test` passed: 113 tests across 12 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed.
+
 ## Phase 5: Entrypoint Pattern and Pack Checks
 
 Goal: improve modern `exports` validation.
@@ -125,6 +205,22 @@ Acceptance criteria:
 
 - Common `./feature/*` export patterns receive useful validation.
 - Unsupported shapes warn without crashing.
+
+Status:
+
+- Completed on 2026-06-23.
+- Entry point checks now support simple single-star export target patterns such as `./dist/feature/*.js`.
+- Entry point pattern validation checks package containment and requires at least one matching built file.
+- Pack checks now cross-check simple export target patterns against npm pack output.
+- Complex export patterns still produce unsupported-target warnings instead of crashing.
+- Added entrypoint tests for valid patterns, missing pattern output, escaping patterns, and unsupported complex patterns.
+- Added pack tests for packed pattern matches, missing packed pattern output, and unsupported complex patterns.
+- `npm test -- tests/entrypoints.test.ts tests/pack.test.ts` passed: 19 tests across 2 test files.
+- `npm test` passed: 119 tests across 12 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed.
 
 ## Phase 6: Conservative Fix Expansion
 
@@ -149,6 +245,24 @@ Acceptance criteria:
 - Running `fix` twice produces no second diff.
 - `fix --json` remains schema-compatible.
 
+Status:
+
+- Completed on 2026-06-23.
+- Added conservative fix plans for `files`, `publishConfig.access`, `engines.node`, and `sideEffects: false`.
+- `fix.files` applies when `manifest.files-missing` is present and a `dist` directory exists.
+- `fix.publish-access` applies to scoped non-private packages missing `publishConfig.access`.
+- `fix.engines-node` applies when `manifest.engines-node-missing` is inferred from TypeScript target metadata.
+- `fix.side-effects` applies only to simple TypeScript-library packages without known side-effect files or install-time lifecycle scripts.
+- Added `manifest.publish-access-missing` and `manifest.engines-node-missing` check IDs to support stable fix metadata.
+- Updated README, examples, and check ID docs for the expanded fix coverage.
+- Added dry-run/schema and idempotency tests for the expanded fixes.
+- `npm test -- tests/fixes.test.ts tests/manifest-checks.test.ts` passed: 23 tests across 2 test files.
+- `npm test` passed: 126 tests across 12 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed.
+
 ## Phase 7: Public Docs and Examples
 
 Goal: make v0.2.0 understandable to users.
@@ -163,6 +277,19 @@ Acceptance criteria:
 
 - Docs explain what changed and how to suppress intentional findings.
 - Docs avoid exposing internal implementation details.
+
+Status:
+
+- Completed on 2026-06-23.
+- Added a `0.2.0` changelog entry covering preset behavior, lifecycle checks, workflow validation, export pattern support, and expanded fixes.
+- Updated README configuration examples with `pkgGuard.preset` and short preset override guidance.
+- Updated check, examples, and release workflow docs for broader validation command recognition, intentional lifecycle suppressions, preset overrides, and scoped publish access workflow warnings.
+- Reviewed `/site` and refreshed the product site copy for lifecycle checks, preset-shaped findings, export pattern support, scoped publish access, and the updated checked-surface count.
+- `npm test` passed: 126 tests across 12 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed.
 
 ## Phase 8: Final Verification
 
@@ -184,3 +311,15 @@ Acceptance criteria:
 - Full verification passes.
 - Packed output is clean.
 - The release notes map directly to implemented user-facing behavior.
+
+Status:
+
+- Completed on 2026-06-24.
+- Updated `package.json` and `package-lock.json` from `0.1.2` to `0.2.0`.
+- Confirmed the `0.2.0` changelog maps to implemented behavior: active presets, preset-aware applicability, lifecycle checks, workflow validation updates, export pattern support, and expanded conservative fixes.
+- `npm test` passed: 126 tests across 12 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed.
+- `npm pack --dry-run --json --ignore-scripts` passed and produced `pkg-guard-0.2.0.tgz` with 104 entries, no bundled dependencies, and the CLI bin emitted as executable.

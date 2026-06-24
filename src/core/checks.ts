@@ -2,6 +2,7 @@ import type { ProjectContext } from "./context.js";
 import type { Finding } from "./findings.js";
 import { dependencyChecks } from "../checks/dependencies.js";
 import { entrypointChecks } from "../checks/entrypoints.js";
+import { lifecycleChecks } from "../checks/lifecycle.js";
 import { manifestChecks } from "../checks/manifest.js";
 import { packChecks } from "../checks/pack.js";
 import { typescriptChecks } from "../checks/typescript.js";
@@ -17,6 +18,7 @@ const checks: Check[] = [
   ...entrypointChecks,
   ...packChecks,
   ...typescriptChecks,
+  ...lifecycleChecks,
   ...workflowChecks,
   ...dependencyChecks
 ];

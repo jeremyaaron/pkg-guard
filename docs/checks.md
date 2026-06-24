@@ -32,6 +32,8 @@ npx pkg-guard check --ignore dependencies.runtime-in-dev
 | `manifest.repository-missing` | warning | Repository metadata improves package traceability. |
 | `manifest.files-missing` | warning | Unconstrained packlists can publish unintended files. |
 | `manifest.types-missing` | warning | Generated declarations should be exposed through package type metadata. |
+| `manifest.publish-access-missing` | warning | Scoped packages should declare npm publish access explicitly. |
+| `manifest.engines-node-missing` | warning | Runtime Node support should be exposed when it can be inferred safely. |
 | `manifest.private-publishable` | warning | `private: true` conflicts with publish-oriented metadata. |
 
 ## Entry Points
@@ -65,9 +67,16 @@ npx pkg-guard check --ignore dependencies.runtime-in-dev
 | `typescript.declaration-map-enabled` | warning | Declaration maps may expose source layout or local paths. |
 | `typescript.outdir-mismatch` | warning | Runtime entrypoints should normally point at generated output. |
 
+## Lifecycle Scripts
+
+| ID | Default | Rationale |
+| --- | --- | --- |
+| `lifecycle.install-script` | warning | Install-time lifecycle scripts run on consumer machines and should be intentional. |
+| `lifecycle.suspicious-install-script` | error | Install-time network, credential, or destructive shell behavior is risky for published packages. |
+
 ## Workflows
 
-Workflow validation recognizes direct GitHub Actions `run:` commands and validation commands reached through package scripts such as `npm run verify:release`, `pnpm run verify:release`, `yarn verify:release`, and `bun run verify:release`.
+Workflow validation recognizes direct GitHub Actions `run:` commands and validation commands reached through package scripts such as `npm run verify:release`, `pnpm run verify:release`, `yarn verify:release`, and `bun run verify:release`. Direct validation commands can use `npx`, `npm exec`, `pnpm dlx`, `yarn dlx`, or `bunx`.
 
 | ID | Default | Rationale |
 | --- | --- | --- |
@@ -75,6 +84,9 @@ Workflow validation recognizes direct GitHub Actions `run:` commands and validat
 | `workflow.long-lived-npm-token` | warning | npm trusted publishing avoids long-lived npm automation tokens. |
 | `workflow.id-token-permission-missing` | warning | Trusted publishing requires GitHub Actions OIDC permission. |
 | `workflow.branch-push-publish` | error | Publishing on ordinary branch pushes is risky. |
+| `workflow.self-hosted-trusted-publishing` | warning | Self-hosted runners need extra trust review when used with npm trusted publishing. |
+| `workflow.publish-access-missing` | warning | Scoped packages should publish with explicit npm access. |
+| `workflow.publish-access-mismatch` | warning | Publish workflow access should match `publishConfig.access` when configured. |
 | `workflow.install-step-missing` | warning | Publish workflows should install dependencies before publishing. |
 | `workflow.test-step-missing` | warning | Publish workflows should run tests before publishing. |
 | `workflow.build-step-missing` | warning | Publish workflows should build before publishing. |

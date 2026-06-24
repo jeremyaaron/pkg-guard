@@ -26,6 +26,8 @@ function runManifestChecks(context: ProjectContext): Finding[] {
   findings.push(...checkRepository(context));
   findings.push(...checkFiles(manifest));
   findings.push(...checkTypesMetadata(context));
+  findings.push(...checkPublishAccess(manifest));
+  findings.push(...checkEnginesNode(context));
   findings.push(...checkPrivatePublishable(manifest));
 
   return findings;
@@ -192,7 +194,8 @@ function checkFiles(manifest: PackageManifest): Finding[] {
       message: "package.json does not define files, so npm will use default packlist behavior.",
       file: "package.json",
       path: "$.files",
-      suggestion: "Add a files array once build output is known."
+      suggestion: "Add a files array once build output is known.",
+      fixable: true
     }
   ];
 }
@@ -245,6 +248,52 @@ function checkPrivatePublishable(manifest: PackageManifest): Finding[] {
   return [];
 }
 
+function checkPublishAccess(manifest: PackageManifest): Finding[] {
+  if (
+    manifest.private === true ||
+    typeof manifest.name !== "string" ||
+    !manifest.name.startsWith("@") ||
+    getPublishAccess(manifest.publishConfig)
+  ) {
+    return [];
+  }
+
+  return [
+    {
+      id: "manifest.publish-access-missing",
+      severity: "warning",
+      title: "Scoped package publish access is missing",
+      message: "This scoped package does not define publishConfig.access.",
+      file: "package.json",
+      path: "$.publishConfig.access",
+      suggestion: 'Add publishConfig.access: "public" for a scoped public package.',
+      fixable: true
+    }
+  ];
+}
+
+function checkEnginesNode(context: ProjectContext): Finding[] {
+  const manifest = context.manifest.data;
+  const inferredRange = inferNodeEngineRange(context);
+
+  if (manifest.private === true || !inferredRange || hasNodeEngine(manifest.engines)) {
+    return [];
+  }
+
+  return [
+    {
+      id: "manifest.engines-node-missing",
+      severity: "warning",
+      title: "Node engine metadata is missing",
+      message: `TypeScript target settings imply Node ${inferredRange}, but package.json does not define engines.node.`,
+      file: "package.json",
+      path: "$.engines.node",
+      suggestion: `Add engines.node: "${inferredRange}" so consumers see the supported Node runtime.`,
+      fixable: true
+    }
+  ];
+}
+
 function isValidPackageName(value: string): boolean {
   if (value.length === 0 || value.length > 214) {
     return false;
@@ -282,4 +331,54 @@ function hasPublishMetadata(manifest: PackageManifest): boolean {
     typeof manifest.name === "string" ||
     typeof manifest.version === "string"
   );
+}
+
+function getPublishAccess(value: unknown): "public" | "restricted" | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return value.access === "public" || value.access === "restricted" ? value.access : null;
+}
+
+function hasNodeEngine(value: unknown): boolean {
+  return isRecord(value) && typeof value.node === "string" && value.node.trim() !== "";
+}
+
+function inferNodeEngineRange(context: ProjectContext): string | null {
+  const tsconfig = context.tsconfig?.data;
+
+  if (!isRecord(tsconfig) || !isRecord(tsconfig.compilerOptions)) {
+    return null;
+  }
+
+  const target = tsconfig.compilerOptions.target;
+
+  if (typeof target !== "string") {
+    return null;
+  }
+
+  return nodeRangeForTsTarget(target);
+}
+
+function nodeRangeForTsTarget(target: string): string | null {
+  const normalized = target.toLowerCase();
+
+  if (normalized === "es2022" || normalized === "esnext") {
+    return ">=18.0.0";
+  }
+
+  if (normalized === "es2021") {
+    return ">=16.0.0";
+  }
+
+  if (normalized === "es2020") {
+    return ">=14.0.0";
+  }
+
+  return null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }

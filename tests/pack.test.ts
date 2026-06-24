@@ -62,6 +62,70 @@ describe("pack checks", () => {
     expect(findings.map((finding) => finding.id)).toContain("pack.entrypoint-missing");
   });
 
+  it("passes when export patterns match packed files", async () => {
+    const root = await createFixture({
+      packageJson: basePackage({
+        exports: {
+          "./feature/*": "./dist/feature/*.js"
+        },
+        files: ["dist", "README.md", "LICENSE"]
+      }),
+      files: {
+        "dist/feature/alpha.js": "export {};\n",
+        "README.md": "# Fixture\n",
+        "LICENSE": "MIT\n"
+      }
+    });
+
+    const findings = await getCheckFindings(root);
+
+    expect(findings.map((finding) => finding.id)).not.toContain("pack.entrypoint-missing");
+  });
+
+  it("reports export patterns missing from npm pack output", async () => {
+    const root = await createFixture({
+      packageJson: basePackage({
+        exports: {
+          "./feature/*": "./dist/feature/*.js"
+        },
+        files: ["README.md", "LICENSE"]
+      }),
+      files: {
+        "dist/feature/alpha.js": "export {};\n",
+        "README.md": "# Fixture\n",
+        "LICENSE": "MIT\n"
+      }
+    });
+
+    const findings = await getCheckFindings(root);
+    const finding = findings.find((item) => item.id === "pack.entrypoint-missing" && item.path === '$.exports."./feature/*"');
+
+    expect(finding).toMatchObject({
+      severity: "error",
+      title: "Declared entry point pattern is missing from the package"
+    });
+  });
+
+  it("warns on complex export patterns without crashing", async () => {
+    const root = await createFixture({
+      packageJson: basePackage({
+        exports: {
+          "./feature/**": "./dist/feature/**/*.js"
+        },
+        files: ["dist", "README.md", "LICENSE"]
+      }),
+      files: {
+        "dist/feature/alpha.js": "export {};\n",
+        "README.md": "# Fixture\n",
+        "LICENSE": "MIT\n"
+      }
+    });
+
+    const findings = await getCheckFindings(root);
+
+    expect(findings.map((finding) => finding.id)).toContain("pack.unsupported-target");
+  });
+
   it("passes when declared entrypoints and required docs are packed", async () => {
     const root = await createFixture({
       packageJson: basePackage({

@@ -74,9 +74,42 @@ jobs:
     expect(ids).not.toContain("workflow.package-validation-missing");
   });
 
+  it.each([
+    ["npm exec pkg-guard check"],
+    ["pnpm dlx pkg-guard check"],
+    ["yarn dlx pkg-guard check"],
+    ["bunx pkg-guard check"]
+  ])("recognizes %s as package validation", async (validationCommand) => {
+    const root = await createFixture({
+      workflow: createPublishWorkflow(`npm test && npm run build && ${validationCommand}`)
+    });
+
+    const ids = await getCheckFindingIds(root);
+
+    for (const id of missingValidationFindingIds) {
+      expect(ids).not.toContain(id);
+    }
+  });
+
   it("recognizes validation commands reached through nested npm scripts", async () => {
     const root = await createFixture({
       scripts: createReleaseScripts(),
+      workflow: createPublishWorkflow("npm run verify:release")
+    });
+
+    const ids = await getCheckFindingIds(root);
+
+    for (const id of missingValidationFindingIds) {
+      expect(ids).not.toContain(id);
+    }
+  });
+
+  it("recognizes new package validation forms reached through package scripts", async () => {
+    const root = await createFixture({
+      scripts: {
+        "verify:release": "npm test && npm run build && npm run pack:check",
+        "pack:check": "pnpm dlx pkg-guard check"
+      },
       workflow: createPublishWorkflow("npm run verify:release")
     });
 
@@ -175,6 +208,77 @@ jobs:
     const ids = (await getCheckFindings(root)).map((finding) => finding.id);
 
     expect(ids).toContain("workflow.branch-push-publish");
+  });
+
+  it("warns when scoped packages publish without npm access", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "@scope/workflow-fixture"
+      },
+      workflow: createPublishWorkflow("npm test && npm run build && npx pkg-guard check")
+    });
+
+    const ids = await getCheckFindingIds(root);
+
+    expect(ids).toContain("workflow.publish-access-missing");
+  });
+
+  it("warns when publish access conflicts with publishConfig", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "@scope/workflow-fixture",
+        publishConfig: {
+          access: "restricted"
+        }
+      },
+      workflow: createPublishWorkflow("npm test && npm run build && npx pkg-guard check", "npm publish --access public")
+    });
+
+    const ids = await getCheckFindingIds(root);
+
+    expect(ids).toContain("workflow.publish-access-mismatch");
+  });
+
+  it("does not warn when scoped publish access matches package metadata", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "@scope/workflow-fixture"
+      },
+      workflow: createPublishWorkflow("npm test && npm run build && npx pkg-guard check", "npm publish --access public")
+    });
+
+    const ids = await getCheckFindingIds(root);
+
+    expect(ids).not.toContain("workflow.publish-access-missing");
+    expect(ids).not.toContain("workflow.publish-access-mismatch");
+  });
+
+  it("warns when trusted publishing uses a self-hosted runner", async () => {
+    const root = await createFixture({
+      workflow: `
+name: Release
+on:
+  push:
+    tags:
+      - "v*"
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  publish:
+    runs-on: [self-hosted, linux]
+    steps:
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx pkg-guard check
+      - run: npm publish
+`
+    });
+
+    const ids = await getCheckFindingIds(root);
+
+    expect(ids).toContain("workflow.self-hosted-trusted-publishing");
   });
 
   it("reports missing install, test, build, and package validation steps", async () => {
@@ -295,7 +399,7 @@ function createReleaseScripts(): Record<string, string> {
   };
 }
 
-function createPublishWorkflow(validationCommand: string): string {
+function createPublishWorkflow(validationCommand: string, publishCommand = "npm publish"): string {
   return `
 name: Release
 on:
@@ -311,18 +415,23 @@ jobs:
     steps:
       - run: npm ci
       - run: ${validationCommand}
-      - run: npm publish
+      - run: ${publishCommand}
 `;
 }
 
-async function createFixture(options: { workflow: string; scripts?: unknown }): Promise<string> {
+async function createFixture(options: {
+  workflow: string;
+  scripts?: unknown;
+  packageJson?: Record<string, unknown>;
+}): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "pkg-guard-workflow-"));
   const manifest: Record<string, unknown> = {
     name: "workflow-fixture",
     version: "1.0.0",
     license: "MIT",
     packageManager: "npm@10.8.2",
-    files: ["dist", "README.md", "LICENSE"]
+    files: ["dist", "README.md", "LICENSE"],
+    ...(options.packageJson ?? {})
   };
 
   if (Object.hasOwn(options, "scripts")) {

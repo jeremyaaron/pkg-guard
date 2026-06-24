@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
 import type { Check } from "../core/checks.js";
@@ -7,12 +7,20 @@ import type { Finding } from "../core/findings.js";
 
 type EntrySource = "main" | "module" | "types" | "exports" | "bin";
 
-interface DeclaredEntryPoint {
-  source: EntrySource;
-  target: string;
-  jsonPath: string;
-  requiresShebang: boolean;
-}
+type DeclaredEntryPoint =
+  | {
+      kind: "file";
+      source: EntrySource;
+      target: string;
+      jsonPath: string;
+      requiresShebang: boolean;
+    }
+  | {
+      kind: "pattern";
+      source: "exports";
+      targetPattern: string;
+      jsonPath: string;
+    };
 
 export const entrypointChecks: Check[] = [
   {
@@ -24,6 +32,10 @@ export const entrypointChecks: Check[] = [
 function runEntrypointChecks(context: ProjectContext): Finding[] {
   const findings: Finding[] = [];
   const declared = collectDeclaredEntryPoints(context, findings);
+
+  if (context.preset.name === "cli" && !hasUsableBinTarget(context.manifest.data.bin)) {
+    findings.push(missingCliBinFinding());
+  }
 
   for (const entrypoint of declared) {
     findings.push(...validateEntryPoint(context, entrypoint));
@@ -63,6 +75,7 @@ function collectTopLevelString(
   }
 
   declared.push({
+    kind: "file",
     source,
     target: value,
     jsonPath,
@@ -77,6 +90,7 @@ function collectBinTargets(declared: DeclaredEntryPoint[], findings: Finding[], 
 
   if (typeof value === "string" && value.trim() !== "") {
     declared.push({
+      kind: "file",
       source: "bin",
       target: value,
       jsonPath: "$.bin",
@@ -95,6 +109,7 @@ function collectBinTargets(declared: DeclaredEntryPoint[], findings: Finding[], 
       }
 
       declared.push({
+        kind: "file",
         source: "bin",
         target,
         jsonPath,
@@ -106,6 +121,30 @@ function collectBinTargets(declared: DeclaredEntryPoint[], findings: Finding[], 
   }
 
   findings.push(unsupportedTargetFinding("bin", "$.bin", "bin must be a string or an object of command targets."));
+}
+
+function hasUsableBinTarget(value: unknown): boolean {
+  if (typeof value === "string") {
+    return value.trim() !== "";
+  }
+
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return Object.values(value).some((target) => typeof target === "string" && target.trim() !== "");
+}
+
+function missingCliBinFinding(): Finding {
+  return {
+    id: "entrypoint.target-missing",
+    severity: "error",
+    title: "CLI package is missing a bin entry point",
+    message: "The cli preset requires package.json to define at least one bin target.",
+    file: "package.json",
+    path: "$.bin",
+    suggestion: "Add a bin entry that points at the built CLI file."
+  };
 }
 
 function collectExportTargets(declared: DeclaredEntryPoint[], findings: Finding[], value: unknown): void {
@@ -124,11 +163,22 @@ function collectExportValue(
 ): void {
   if (typeof value === "string") {
     if (value.includes("*")) {
-      findings.push(unsupportedTargetFinding("exports", jsonPath, "export target patterns are not validated in this phase."));
+      if (!isSimplePattern(value)) {
+        findings.push(unsupportedTargetFinding("exports", jsonPath, "export target patterns must contain exactly one * to be validated."));
+        return;
+      }
+
+      declared.push({
+        kind: "pattern",
+        source: "exports",
+        targetPattern: value,
+        jsonPath
+      });
       return;
     }
 
     declared.push({
+      kind: "file",
       source: "exports",
       target: value,
       jsonPath,
@@ -148,6 +198,10 @@ function collectExportValue(
 }
 
 function validateEntryPoint(context: ProjectContext, entrypoint: DeclaredEntryPoint): Finding[] {
+  if (entrypoint.kind === "pattern") {
+    return validateEntryPointPattern(context, entrypoint);
+  }
+
   const findings: Finding[] = [];
   const normalizedTarget = normalizePackageTarget(entrypoint.target);
 
@@ -207,6 +261,58 @@ function validateEntryPoint(context: ProjectContext, entrypoint: DeclaredEntryPo
   return findings;
 }
 
+function validateEntryPointPattern(
+  context: ProjectContext,
+  entrypoint: Extract<DeclaredEntryPoint, { kind: "pattern" }>
+): Finding[] {
+  const normalizedPattern = normalizePackagePattern(entrypoint.targetPattern);
+
+  if (!normalizedPattern) {
+    return [
+      {
+        id: "entrypoint.target-escapes-package",
+        severity: "error",
+        title: "Entry point target escapes the package",
+        message: `exports target pattern ${JSON.stringify(entrypoint.targetPattern)} is absolute or escapes the package root.`,
+        file: "package.json",
+        path: entrypoint.jsonPath
+      }
+    ];
+  }
+
+  const prefix = normalizedPattern.slice(0, normalizedPattern.indexOf("*"));
+  const absolutePrefix = path.resolve(context.root, prefix);
+
+  if (!isInsidePackage(context.root, absolutePrefix)) {
+    return [
+      {
+        id: "entrypoint.target-escapes-package",
+        severity: "error",
+        title: "Entry point target escapes the package",
+        message: `exports target pattern ${JSON.stringify(entrypoint.targetPattern)} resolves outside the package root.`,
+        file: "package.json",
+        path: entrypoint.jsonPath
+      }
+    ];
+  }
+
+  if (!hasMatchingFile(context.root, normalizedPattern)) {
+    return [
+      {
+        id: "entrypoint.target-missing",
+        severity: "error",
+        title: "Entry point pattern does not match files",
+        message: `exports target pattern ${JSON.stringify(entrypoint.targetPattern)} does not match any files.`,
+        file: "package.json",
+        path: entrypoint.jsonPath,
+        suggestion: "Run the package build or update package.json to point at existing exported files."
+      }
+    ];
+  }
+
+  return [];
+}
+
 function normalizePackageTarget(target: string): string | null {
   if (target.trim() === "" || path.isAbsolute(target)) {
     return null;
@@ -219,6 +325,65 @@ function normalizePackageTarget(target: string): string | null {
   }
 
   return normalized;
+}
+
+function normalizePackagePattern(target: string): string | null {
+  if (!isSimplePattern(target) || target.trim() === "" || path.isAbsolute(target)) {
+    return null;
+  }
+
+  const normalized = path.normalize(target);
+
+  if (normalized === "." || normalized === ".." || normalized.startsWith(`..${path.sep}`)) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function isSimplePattern(value: string): boolean {
+  return value.split("*").length === 2;
+}
+
+function hasMatchingFile(root: string, normalizedPattern: string): boolean {
+  const starIndex = normalizedPattern.indexOf("*");
+  const prefix = normalizedPattern.slice(0, starIndex);
+  const suffix = normalizedPattern.slice(starIndex + 1);
+  const searchRoot = path.resolve(root, prefix);
+
+  if (!isInsidePackage(root, searchRoot) || !isReadableDirectory(searchRoot)) {
+    return false;
+  }
+
+  return collectFiles(searchRoot).some((filePath) => {
+    const normalizedFile = path.relative(root, filePath);
+    return normalizedFile.startsWith(prefix) && normalizedFile.endsWith(suffix);
+  });
+}
+
+function collectFiles(root: string): string[] {
+  const entries = readdirSync(root, { withFileTypes: true });
+  const files: string[] = [];
+
+  for (const entry of entries) {
+    const entryPath = path.join(root, entry.name);
+
+    if (entry.isDirectory()) {
+      files.push(...collectFiles(entryPath));
+    } else if (entry.isFile()) {
+      files.push(entryPath);
+    }
+  }
+
+  return files;
+}
+
+function isReadableDirectory(filePath: string): boolean {
+  try {
+    return statSync(filePath).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 function isInsidePackage(root: string, target: string): boolean {

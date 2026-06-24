@@ -225,6 +225,149 @@ describe("pkg-guard fix", () => {
       })
     );
   });
+
+  it("writes files when dist output is present and files is missing", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "files-fixture",
+        version: "1.0.0",
+        license: "MIT",
+        packageManager: "npm@10.8.2"
+      },
+      files: {
+        "package-lock.json": "{}\n",
+        "dist/index.js": "export {};\n",
+        "README.md": "# Fixture\n",
+        "LICENSE": "MIT\n"
+      }
+    });
+
+    const first = await invoke(["fix"], root);
+    const manifestAfterFirst = await readManifest(root);
+    const second = await invoke(["fix"], root);
+
+    expect(first.exitCode).toBe(0);
+    expect(first.stdout).toContain("fix.files");
+    expect(manifestAfterFirst.files).toEqual(["dist", "README.md", "LICENSE"]);
+    expect(second.stdout).toBe("pkg-guard found no fixable issues\n");
+  });
+
+  it("writes publishConfig access for scoped packages", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "@scope/publish-access-fixture",
+        version: "1.0.0",
+        license: "MIT",
+        packageManager: "npm@10.8.2",
+        files: ["dist"]
+      },
+      files: {
+        "package-lock.json": "{}\n",
+        "dist/index.js": "export {};\n"
+      }
+    });
+
+    const first = await invoke(["fix"], root);
+    const manifestAfterFirst = await readManifest(root);
+    const second = await invoke(["fix"], root);
+
+    expect(first.stdout).toContain("fix.publish-access");
+    expect(manifestAfterFirst.publishConfig).toEqual({ access: "public" });
+    expect(second.stdout).toBe("pkg-guard found no fixable issues\n");
+  });
+
+  it("writes engines.node inferred from TypeScript target", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "engines-fixture",
+        version: "1.0.0",
+        license: "MIT",
+        packageManager: "npm@10.8.2",
+        files: ["dist"],
+        engines: {
+          npm: ">=10"
+        }
+      },
+      files: {
+        "package-lock.json": "{}\n",
+        "dist/index.js": "export {};\n",
+        "tsconfig.json": `${JSON.stringify({ compilerOptions: { target: "ES2022" } }, null, 2)}\n`
+      }
+    });
+
+    const first = await invoke(["fix"], root);
+    const manifestAfterFirst = await readManifest(root);
+    const second = await invoke(["fix"], root);
+
+    expect(first.stdout).toContain("fix.engines-node");
+    expect(manifestAfterFirst.engines).toEqual({
+      npm: ">=10",
+      node: ">=18.0.0"
+    });
+    expect(second.stdout).toBe("pkg-guard found no fixable issues\n");
+  });
+
+  it("writes sideEffects false for a simple TypeScript library", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "side-effects-fixture",
+        version: "1.0.0",
+        license: "MIT",
+        packageManager: "npm@10.8.2",
+        main: "./dist/index.js",
+        files: ["dist", "README.md", "LICENSE"]
+      },
+      files: {
+        "package-lock.json": "{}\n",
+        "dist/index.js": "export const value = 1;\n",
+        "README.md": "# Fixture\n",
+        "LICENSE": "MIT\n",
+        "tsconfig.json": `${JSON.stringify({ compilerOptions: { target: "ES2019" } }, null, 2)}\n`
+      }
+    });
+
+    const first = await invoke(["fix"], root);
+    const manifestAfterFirst = await readManifest(root);
+    const second = await invoke(["fix"], root);
+
+    expect(first.stdout).toContain("fix.side-effects");
+    expect(manifestAfterFirst.sideEffects).toBe(false);
+    expect(second.stdout).toBe("pkg-guard found no fixable issues\n");
+  });
+
+  it("keeps fix JSON schema compatible for expanded fixes", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "@scope/json-fix-fixture",
+        version: "1.0.0",
+        license: "MIT",
+        packageManager: "npm@10.8.2",
+        main: "./dist/index.js"
+      },
+      files: {
+        "package-lock.json": "{}\n",
+        "dist/index.js": "export {};\n",
+        "README.md": "# Fixture\n",
+        "LICENSE": "MIT\n",
+        "tsconfig.json": `${JSON.stringify({ compilerOptions: { target: "ES2022" } }, null, 2)}\n`
+      }
+    });
+
+    const result = await invoke(["fix", "--dry-run", "--json"], root);
+    const json = JSON.parse(result.stdout) as {
+      schemaVersion: number;
+      command: string;
+      dryRun: boolean;
+      fixes: Array<{ id: string; findingId: string }>;
+    };
+
+    expect(json.schemaVersion).toBe(1);
+    expect(json.command).toBe("fix");
+    expect(json.dryRun).toBe(true);
+    expect(json.fixes.map((fix) => fix.id)).toEqual(
+      expect.arrayContaining(["fix.files", "fix.publish-access", "fix.engines-node", "fix.side-effects"])
+    );
+  });
 });
 
 async function invoke(args: string[], cwd: string): Promise<{

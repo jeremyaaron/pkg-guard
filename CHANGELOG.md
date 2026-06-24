@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0
+
+- Makes package intent operational with `generic`, `typescript-library`, and `cli` presets. `pkg-guard` infers a preset by default and allows `pkgGuard.preset` overrides.
+- Reduces noisy TypeScript-library findings for CLI and generic packages while strengthening CLI `bin` validation.
+- Adds lifecycle script checks for install-time scripts and high-confidence suspicious install behavior.
+- Improves release workflow validation with broader package-validation command recognition, scoped package publish access checks, and self-hosted trusted publishing warnings.
+- Adds conservative support for simple single-star export target patterns in entrypoint and pack checks.
+- Expands `pkg-guard fix` with safe metadata fixes for `files`, scoped package access, inferred Node engines, and low-risk `sideEffects`.
+
 ## 0.1.2
 
 - Updates `pkg-guard init-release` so scoped packages publish with the correct npm access flag.

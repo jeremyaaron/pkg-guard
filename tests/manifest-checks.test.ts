@@ -140,6 +140,57 @@ describe("manifest checks", () => {
     });
   });
 
+  it("reports missing publish access for scoped packages", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "@scope/publish-access-fixture",
+        version: "1.0.0",
+        license: "MIT",
+        packageManager: "npm@10.8.2",
+        files: ["dist"]
+      },
+      files: {
+        "package-lock.json": "{}\n"
+      }
+    });
+
+    const findings = await getCheckFindings(root);
+    const finding = findings.find((item) => item.id === "manifest.publish-access-missing");
+
+    expect(finding).toMatchObject({
+      severity: "warning",
+      file: "package.json",
+      path: "$.publishConfig.access",
+      fixable: true
+    });
+  });
+
+  it("reports missing Node engines when TypeScript target implies a runtime floor", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "engines-fixture",
+        version: "1.0.0",
+        license: "MIT",
+        packageManager: "npm@10.8.2",
+        files: ["dist"]
+      },
+      files: {
+        "package-lock.json": "{}\n",
+        "tsconfig.json": `${JSON.stringify({ compilerOptions: { target: "ES2022" } }, null, 2)}\n`
+      }
+    });
+
+    const findings = await getCheckFindings(root);
+    const finding = findings.find((item) => item.id === "manifest.engines-node-missing");
+
+    expect(finding).toMatchObject({
+      severity: "warning",
+      file: "package.json",
+      path: "$.engines.node",
+      fixable: true
+    });
+  });
+
   it("does not report missing types metadata when types already exists", async () => {
     const root = await createFixture({
       packageJson: {

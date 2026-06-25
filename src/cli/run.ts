@@ -1,4 +1,4 @@
-import { getBatchExitCode, runBatchChecks, type BatchCheckReport } from "../core/batch.js";
+import { getBatchExitCode, runBatchChecks } from "../core/batch.js";
 import { discoverProject } from "../core/discovery.js";
 import { runChecks } from "../core/checks.js";
 import { applyFixPlans, planFixes, renderFixPlanHuman, renderFixPlanJson } from "../core/fixes.js";
@@ -6,6 +6,7 @@ import { createReport, getExitCode, type Finding } from "../core/findings.js";
 import { applyFindingPolicy } from "../core/policy.js";
 import { initReleaseWorkflow, renderInitReleaseHuman, renderInitReleaseJson } from "../core/release.js";
 import { discoverWorkspaces, selectWorkspaceTargets } from "../core/workspaces.js";
+import { renderBatchHumanReport, renderBatchJsonReport } from "../reporters/batch.js";
 import { renderHumanReport } from "../reporters/human.js";
 import { renderJsonReport } from "../reporters/json.js";
 import { getCommandHelpText, getHelpText } from "./help.js";
@@ -129,11 +130,6 @@ async function runWorkspaceCommand(options: ParsedOptions, io: CliIO): Promise<n
     return 2;
   }
 
-  if (options.format === "json") {
-    io.stderr.write("Workspace JSON output is not implemented yet.\n");
-    return 2;
-  }
-
   if (options.format === "sarif") {
     io.stderr.write("SARIF output is not implemented yet.\n");
     return 2;
@@ -167,40 +163,8 @@ async function runWorkspaceCommand(options: ParsedOptions, io: CliIO): Promise<n
     strict: options.strict
   });
 
-  io.stdout.write(renderWorkspaceCheckSummary(report));
+  io.stdout.write(options.format === "json" ? renderBatchJsonReport(report) : renderBatchHumanReport(report));
   return getBatchExitCode(report);
-}
-
-function renderWorkspaceCheckSummary(report: BatchCheckReport): string {
-  const lines = [
-    `pkg-guard checked ${formatCount(report.summary.packages, "package")} and skipped ${formatCount(report.summary.skipped, "package")}`
-  ];
-
-  for (const packageReport of report.packages) {
-    const findings = packageReport.report.findings;
-    const label = packageReport.target.name
-      ? `${packageReport.target.relativePath} (${packageReport.target.name})`
-      : packageReport.target.relativePath;
-
-    lines.push("", label);
-
-    if (findings.length === 0) {
-      lines.push("  no issues");
-      continue;
-    }
-
-    for (const finding of findings) {
-      lines.push(`  ${finding.severity} ${finding.id}: ${finding.message}`);
-    }
-  }
-
-  lines.push("", `summary: ${report.summary.errors} errors, ${report.summary.warnings} warnings, ${report.summary.info} info`);
-
-  return `${lines.join("\n")}\n`;
-}
-
-function formatCount(count: number, noun: string): string {
-  return `${count} ${count === 1 ? noun : `${noun}s`}`;
 }
 
 function hasWorkspaceOption(options: ParsedOptions): boolean {

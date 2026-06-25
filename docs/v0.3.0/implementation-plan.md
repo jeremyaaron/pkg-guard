@@ -302,7 +302,24 @@ Acceptance criteria:
 
 Status:
 
-- Pending.
+- Completed on 2026-06-24.
+- Added `src/reporters/batch.ts` with dedicated human and JSON renderers for batch check reports.
+- Replaced the temporary inline workspace summary in the CLI with the batch human reporter.
+- Enabled `pkg-guard check --workspaces --format json`.
+- Batch JSON uses a schema-versioned wrapper and keeps package findings inside each package report.
+- Batch JSON includes top-level workspace findings separately from package findings.
+- Batch JSON includes package name, relative path, private status, source, and skipped package metadata.
+- Single-package JSON output remains unchanged.
+- Added reporter tests for grouped batch human output and the batch JSON wrapper.
+- Updated CLI tests for workspace JSON output through the command path.
+- `npm test -- tests/reporters.test.ts tests/cli-run.test.ts tests/batch.test.ts` passed: 32 tests across 3 test files.
+- `npm run typecheck` passed.
+- `npm test` passed: 165 tests across 14 test files.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed with no issues.
+- `node dist/cli/index.js check --workspaces` passed in this non-workspace repo with 0 checked packages and 0 skipped packages.
+- `node dist/cli/index.js check --workspaces --format json` passed and emitted the batch JSON wrapper.
 
 ## Phase 6: SARIF Reporter
 

@@ -221,14 +221,37 @@ describe("runCli", () => {
     expect(result.stdout).toContain("no issues");
   });
 
-  it("keeps workspace JSON output as a later phase boundary", async () => {
+  it("prints workspace JSON output", async () => {
     const fixture = await createPackageFixture({
       workspaces: ["packages/*"]
     });
+    await writePackageJson(join(fixture, "packages", "a", "package.json"), {
+      name: "a",
+      version: "1.0.0",
+      license: "MIT",
+      packageManager: "npm@10.8.2",
+      files: ["dist"]
+    });
+    await writeFile(join(fixture, "packages", "a", "README.md"), "# A\n");
+    await writeFile(join(fixture, "packages", "a", "LICENSE"), "MIT\n");
     const result = await invoke(["check", "--workspaces", "--format", "json"], fixture);
+    const report = JSON.parse(result.stdout) as {
+      schemaVersion: number;
+      summary: { packages: number; skipped: number; errors: number; warnings: number; info: number };
+      packages: Array<{ name: string | null; relativePath: string; private: boolean; report: unknown }>;
+      findings: unknown[];
+    };
 
-    expect(result.exitCode).toBe(2);
-    expect(result.stderr).toBe("Workspace JSON output is not implemented yet.\n");
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(report.schemaVersion).toBe(1);
+    expect(report.summary).toEqual({ packages: 1, skipped: 0, errors: 0, warnings: 0, info: 0 });
+    expect(report.packages[0]).toMatchObject({
+      name: "a",
+      relativePath: "packages/a",
+      private: false
+    });
+    expect(report.findings).toEqual([]);
   });
 
   it("reports missing workspace selectors before batch execution", async () => {

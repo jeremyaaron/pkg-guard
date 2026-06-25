@@ -313,12 +313,14 @@ describe("runCli", () => {
     expect(result.stderr).toContain('No workspace package matched "missing".');
   });
 
-  it("parses init but reports the later phase stub", async () => {
+  it("runs init as a command shell", async () => {
     const fixture = await createPackageFixture();
     const result = await invoke(["init", "--dry-run"], fixture);
 
-    expect(result.exitCode).toBe(2);
-    expect(result.stderr).toBe("pkg-guard init is not implemented yet.\n");
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("pkg-guard planned 1 init change");
+    expect(result.stdout).toContain("init.check-script");
   });
 });
 

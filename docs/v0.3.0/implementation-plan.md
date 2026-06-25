@@ -457,7 +457,27 @@ Acceptance criteria:
 
 Status:
 
-- Pending.
+- Completed on 2026-06-24.
+- Added `src/core/init.ts` with conservative init planning, application, and human/JSON rendering.
+- `pkg-guard init` now adds `scripts.pkg:check = "pkg-guard check"` when no equivalent script exists.
+- `pkg-guard init` now adds `pkgGuard.preset` only when package intent is inferred as `cli` or `typescript-library` and no preset is already configured.
+- `pkg-guard init --dry-run` previews changes without writing.
+- `pkg-guard init --format json` emits schema-versioned init output.
+- Existing `pkg:check` scripts are not overwritten.
+- Existing scripts that already run `pkg-guard check` avoid duplicate script creation.
+- Human init output recommends `pkg-guard init-release` when no release workflow is present.
+- `pkg-guard init --workspaces` plans/applies the root workspace `pkg:check = "pkg-guard check --workspaces"` script.
+- `pkg-guard init --workspaces --dry-run` previews the root workspace script without writing.
+- `pkg-guard init --workspace <selector>` applies init changes only to selected workspace packages.
+- Added init tests for dry-run safety, single-package apply, existing script and preset protection, duplicate script avoidance, JSON output, workspace root planning/apply, and selected workspace package apply.
+- `npm test -- tests/init.test.ts tests/cli-run.test.ts` passed: 31 tests across 2 test files.
+- `npm run typecheck` passed.
+- `npm test` passed: 180 tests across 15 test files.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js init --dry-run` passed and previewed init changes without writing.
+- `node dist/cli/index.js init --workspaces --dry-run` passed and previewed workspace root init changes without writing.
+- `node dist/cli/index.js check` passed with no issues.
 
 ## Phase 9: Trusted Publishing Refresh
 

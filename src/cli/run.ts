@@ -1,8 +1,10 @@
 import { getBatchExitCode, getBatchFixExitCode, runBatchChecks, runBatchFixes } from "../core/batch.js";
+import type { ProjectContext } from "../core/context.js";
 import { discoverProject } from "../core/discovery.js";
 import { runChecks } from "../core/checks.js";
 import { applyFixPlans, planFixes, renderFixPlanHuman, renderFixPlanJson } from "../core/fixes.js";
 import { createReport, getExitCode, type Finding } from "../core/findings.js";
+import { applyInitPlans, planInit, renderInitHuman, renderInitJson, type InitPlan } from "../core/init.js";
 import { applyFindingPolicy } from "../core/policy.js";
 import { initReleaseWorkflow, renderInitReleaseHuman, renderInitReleaseJson } from "../core/release.js";
 import { discoverWorkspaces, selectWorkspaceTargets } from "../core/workspaces.js";
@@ -47,13 +49,12 @@ export async function runCli(args: string[], io: CliIO): Promise<number> {
 }
 
 async function runCommand(options: ParsedOptions, io: CliIO): Promise<number> {
-  if (hasWorkspaceOption(options)) {
-    return await runWorkspaceCommand(options, io);
+  if (options.command === "init") {
+    return await runInitCommand(options, io);
   }
 
-  if (options.command === "init") {
-    io.stderr.write("pkg-guard init is not implemented yet.\n");
-    return 2;
+  if (hasWorkspaceOption(options)) {
+    return await runWorkspaceCommand(options, io);
   }
 
   if (options.command === "fix") {
@@ -71,6 +72,194 @@ async function runCommand(options: ParsedOptions, io: CliIO): Promise<number> {
 
   io.stdout.write(output);
   return getExitCode(findings);
+}
+
+interface PackageInitReport {
+  label: string;
+  plans: InitPlan[];
+  changedFiles: string[];
+}
+
+async function runInitCommand(options: ParsedOptions, io: CliIO): Promise<number> {
+  if (hasWorkspaceOption(options)) {
+    return await runWorkspaceInitCommand(options, io);
+  }
+
+  const discovery = await discoverProject(options.cwd);
+
+  if (!discovery.context) {
+    const report = createReport(options.command, options.cwd, discovery.findings);
+    io.stdout.write(options.format === "json" ? renderJsonReport(report) : renderHumanReport(report));
+    return getExitCode(discovery.findings);
+  }
+
+  const plans = planInit(discovery.context, { checkScript: "pkg-guard check" });
+  const result = options.dryRun ? { changedFiles: [] } : await applyInitPlans(discovery.context, plans);
+  const recommendation = shouldRecommendInitRelease(discovery.context)
+    ? "\nNext: run pkg-guard init-release to create a trusted publishing workflow.\n"
+    : "";
+
+  io.stdout.write(
+    options.format === "json"
+      ? renderInitJson(plans, options.dryRun, result.changedFiles)
+      : `${renderInitHuman(plans, options.dryRun, result.changedFiles)}${recommendation}`
+  );
+  return 0;
+}
+
+async function runWorkspaceInitCommand(options: ParsedOptions, io: CliIO): Promise<number> {
+  if (options.workspaces && !options.dryRun) {
+    const discovery = await discoverWorkspaces(options.cwd);
+    const blockingFindings = discovery.findings.filter((finding) => finding.severity === "error");
+
+    if (blockingFindings.length > 0) {
+      for (const finding of blockingFindings) {
+        io.stderr.write(`${finding.id}: ${finding.message}\n`);
+      }
+
+      return 2;
+    }
+
+    const rootDiscovery = await discoverProject(discovery.root);
+
+    if (!rootDiscovery.context) {
+      const report = createReport(options.command, discovery.root, rootDiscovery.findings);
+      io.stdout.write(options.format === "json" ? renderJsonReport(report) : renderHumanReport(report));
+      return getExitCode(rootDiscovery.findings);
+    }
+
+    const plans = planInit(rootDiscovery.context, { checkScript: "pkg-guard check --workspaces" });
+    const result = await applyInitPlans(rootDiscovery.context, plans);
+    const packageReports = [
+      {
+        label: ".",
+        plans,
+        changedFiles: result.changedFiles
+      }
+    ];
+
+    io.stdout.write(renderWorkspaceInitReports(packageReports, options.dryRun, options.format === "json"));
+    return 0;
+  }
+
+  const discovery = await discoverWorkspaces(options.cwd);
+  const selection = selectWorkspaceTargets(discovery, {
+    workspaces: options.workspaces,
+    selectors: options.workspace,
+    includePrivate: options.includePrivate,
+    includeRoot: options.includeRoot
+  });
+  const blockingFindings = [...discovery.findings, ...selection.findings].filter((finding) => finding.severity === "error");
+
+  if (blockingFindings.length > 0) {
+    for (const finding of blockingFindings) {
+      io.stderr.write(`${finding.id}: ${finding.message}\n`);
+    }
+
+    return 2;
+  }
+
+  const reports: PackageInitReport[] = [];
+
+  if (options.workspaces) {
+    const rootDiscovery = await discoverProject(discovery.root);
+
+    if (rootDiscovery.context) {
+      const plans = planInit(rootDiscovery.context, { checkScript: "pkg-guard check --workspaces" });
+      reports.push({
+        label: ".",
+        plans,
+        changedFiles: []
+      });
+    }
+  } else {
+    for (const target of selection.targets) {
+      const packageDiscovery = await discoverProject(target.root);
+
+      if (!packageDiscovery.context) {
+        continue;
+      }
+
+      const plans = planInit(packageDiscovery.context, { checkScript: "pkg-guard check" });
+      const result = options.dryRun ? { changedFiles: [] } : await applyInitPlans(packageDiscovery.context, plans);
+
+      reports.push({
+        label: formatWorkspaceLabel(target.relativePath, target.name),
+        plans,
+        changedFiles: result.changedFiles
+      });
+    }
+  }
+
+  io.stdout.write(renderWorkspaceInitReports(reports, options.dryRun, options.format === "json"));
+  return 0;
+}
+
+function renderWorkspaceInitReports(reports: readonly PackageInitReport[], dryRun: boolean, json: boolean): string {
+  if (json) {
+    return `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        command: "init",
+        dryRun,
+        summary: {
+          packages: reports.length,
+          plans: reports.reduce((count, report) => count + report.plans.length, 0),
+          changedFiles: reports.reduce((count, report) => count + report.changedFiles.length, 0)
+        },
+        packages: reports.map((report) => ({
+          label: report.label,
+          changedFiles: report.changedFiles,
+          plans: report.plans
+        }))
+      },
+      null,
+      2
+    )}\n`;
+  }
+
+  const planCount = reports.reduce((count, report) => count + report.plans.length, 0);
+
+  if (planCount === 0) {
+    return "pkg-guard found no workspace init changes\n";
+  }
+
+  const lines = [
+    dryRun
+      ? `pkg-guard planned ${formatCount(planCount, "init change")} across ${formatCount(reports.length, "package")}`
+      : `pkg-guard applied ${formatCount(planCount, "init change")} across ${formatCount(reports.length, "package")}`
+  ];
+
+  for (const report of reports.filter((item) => item.plans.length > 0 || item.changedFiles.length > 0)) {
+    lines.push("", report.label);
+
+    for (const plan of report.plans) {
+      lines.push(`${dryRun ? "  plan" : "  init"} ${plan.id}`);
+      lines.push(`    ${plan.description}`);
+
+      for (const operation of plan.operations) {
+        lines.push(`    ${operation.path} = ${JSON.stringify(operation.value)}`);
+      }
+    }
+
+    for (const changedFile of report.changedFiles) {
+      lines.push(`  changed ${changedFile}`);
+    }
+  }
+
+  return `${lines.join("\n").trimEnd()}\n`;
+}
+
+function shouldRecommendInitRelease(context: ProjectContext): boolean {
+  return context.workflows.length === 0;
+}
+
+function formatWorkspaceLabel(relativePath: string, name: string | null): string {
+  return name ? `${relativePath} (${name})` : relativePath;
+}
+
+function formatCount(count: number, noun: string): string {
+  return `${count} ${count === 1 ? noun : `${noun}s`}`;
 }
 
 async function runInitReleaseCommand(options: ParsedOptions, io: CliIO): Promise<number> {

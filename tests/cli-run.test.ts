@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -168,11 +168,34 @@ describe("runCli", () => {
   });
 
   it("parses workspace options but reports the later phase stub", async () => {
-    const fixture = await createPackageFixture();
+    const fixture = await createPackageFixture({
+      workspaces: ["packages/*"]
+    });
+    await writePackageJson(join(fixture, "packages", "a", "package.json"), {
+      name: "a",
+      version: "1.0.0"
+    });
     const result = await invoke(["check", "--workspaces"], fixture);
 
     expect(result.exitCode).toBe(2);
-    expect(result.stderr).toBe("Workspace options are not implemented yet.\n");
+    expect(result.stderr).toBe(
+      "Workspace target selection matched 1 package(s) and skipped 0 package(s); batch execution is not implemented yet.\n"
+    );
+  });
+
+  it("reports missing workspace selectors before batch execution", async () => {
+    const fixture = await createPackageFixture({
+      workspaces: ["packages/*"]
+    });
+    await writePackageJson(join(fixture, "packages", "a", "package.json"), {
+      name: "a",
+      version: "1.0.0"
+    });
+    const result = await invoke(["check", "--workspace", "missing"], fixture);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("workspace.selector-not-found");
+    expect(result.stderr).toContain('No workspace package matched "missing".');
   });
 
   it("parses init but reports the later phase stub", async () => {
@@ -211,26 +234,25 @@ async function invoke(args: string[], cwd = "/repo"): Promise<{
   return { exitCode, stdout, stderr };
 }
 
-async function createPackageFixture(): Promise<string> {
+async function createPackageFixture(overrides: Record<string, unknown> = {}): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "pkg-guard-package-"));
 
-  await writeFile(
-    join(root, "package.json"),
-    `${JSON.stringify(
-      {
-        name: "fixture",
-        version: "1.0.0",
-        license: "MIT",
-        packageManager: "npm@10.8.2",
-        files: ["dist"]
-      },
-      null,
-      2
-    )}\n`
-  );
+  await writePackageJson(join(root, "package.json"), {
+    name: "fixture",
+    version: "1.0.0",
+    license: "MIT",
+    packageManager: "npm@10.8.2",
+    files: ["dist"],
+    ...overrides
+  });
   await writeFile(join(root, "package-lock.json"), "{}\n");
   await writeFile(join(root, "README.md"), "# Fixture\n");
   await writeFile(join(root, "LICENSE"), "MIT\n");
 
   return root;
+}
+
+async function writePackageJson(filePath: string, data: Record<string, unknown>): Promise<void> {
+  await mkdir(join(filePath, ".."), { recursive: true });
+  await writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`);
 }

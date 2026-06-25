@@ -196,7 +196,27 @@ Acceptance criteria:
 
 Status:
 
-- Pending.
+- Completed on 2026-06-24.
+- Added `WorkspaceRunTarget`, `WorkspaceTargetSelectionOptions`, and `WorkspaceTargetSelection` models.
+- Added `selectWorkspaceTargets` on top of Phase 2 discovery.
+- `--workspaces` selection includes workspace children and excludes the root by default.
+- `--include-root` includes the root package when eligible.
+- `private: true` packages are skipped by default and tracked in the skipped target summary.
+- `--include-private` includes private workspace packages and private root packages when selected.
+- `--workspace <selector>` selection supports exact package names and normalized relative package paths.
+- Missing selectors produce `workspace.selector-not-found` findings.
+- Target and skipped lists are sorted deterministically.
+- Wired workspace CLI flags through target selection before the Phase 4 batch-execution stub.
+- CLI workspace commands now report selected/skipped package counts when selection succeeds, and selector/config errors before batch execution.
+- Added workspace selection tests for default child selection, private skipping, `--include-private`, `--include-root`, private root skipping, package-name selectors, relative-path selectors, and missing selectors.
+- Updated CLI tests for selection-aware workspace stubs and missing selector errors.
+- `npm test -- tests/workspaces.test.ts tests/cli-run.test.ts` passed: 39 tests across 2 test files.
+- `npm run typecheck` passed.
+- `npm test` passed: 156 tests across 13 test files.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed with no issues.
+- `node dist/cli/index.js check --workspaces` returned the expected Phase 4 batch-execution stub after selecting 0 packages in this non-workspace repo.
 
 ## Phase 4: Batch Check Execution
 

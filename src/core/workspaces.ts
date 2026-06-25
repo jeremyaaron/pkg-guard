@@ -22,6 +22,28 @@ export interface WorkspacePackage {
   manifestPath: string;
 }
 
+export interface WorkspaceRunTarget {
+  root: string;
+  relativePath: string;
+  name: string | null;
+  private: boolean;
+  manifestPath: string;
+  source: "root" | "workspace";
+}
+
+export interface WorkspaceTargetSelectionOptions {
+  workspaces: boolean;
+  selectors: string[];
+  includePrivate: boolean;
+  includeRoot: boolean;
+}
+
+export interface WorkspaceTargetSelection {
+  targets: WorkspaceRunTarget[];
+  skipped: WorkspaceRunTarget[];
+  findings: Finding[];
+}
+
 export interface WorkspaceDiscovery {
   root: string;
   manifest: PackageManifestFile | null;
@@ -86,6 +108,50 @@ export async function discoverWorkspaces(rootInput: string): Promise<WorkspaceDi
     manifest: manifest.manifest,
     patterns: patternResult.patterns,
     packages: [...included.values()].sort((left, right) => left.relativePath.localeCompare(right.relativePath)),
+    findings
+  };
+}
+
+export function selectWorkspaceTargets(
+  discovery: WorkspaceDiscovery,
+  options: WorkspaceTargetSelectionOptions
+): WorkspaceTargetSelection {
+  const targets = new Map<string, WorkspaceRunTarget>();
+  const skipped = new Map<string, WorkspaceRunTarget>();
+  const findings: Finding[] = [];
+  const workspaceTargets = discovery.packages.map(workspacePackageToTarget);
+
+  if (options.workspaces) {
+    for (const target of workspaceTargets) {
+      addSelectedTarget(targets, skipped, target, options.includePrivate);
+    }
+
+    if (options.includeRoot) {
+      const rootTarget = rootManifestToTarget(discovery);
+
+      if (rootTarget) {
+        addSelectedTarget(targets, skipped, rootTarget, options.includePrivate);
+      }
+    }
+  }
+
+  for (const selector of options.selectors) {
+    const normalizedSelector = normalizeSelector(selector);
+    const matches = workspaceTargets.filter((target) => matchesWorkspaceSelector(target, normalizedSelector));
+
+    if (matches.length === 0) {
+      findings.push(workspaceSelectorNotFoundFinding(selector));
+      continue;
+    }
+
+    for (const target of matches) {
+      addSelectedTarget(targets, skipped, target, options.includePrivate);
+    }
+  }
+
+  return {
+    targets: [...targets.values()].sort(compareTargets),
+    skipped: [...skipped.values()].sort(compareTargets),
     findings
   };
 }
@@ -381,6 +447,75 @@ function workspacePackageJsonInvalidFinding(workspaceRoot: string, packageRoot: 
     title: "Workspace package.json is invalid",
     message,
     file: path.posix.join(relativePath, "package.json")
+  };
+}
+
+function workspacePackageToTarget(workspacePackage: WorkspacePackage): WorkspaceRunTarget {
+  return {
+    ...workspacePackage,
+    source: "workspace"
+  };
+}
+
+function rootManifestToTarget(discovery: WorkspaceDiscovery): WorkspaceRunTarget | null {
+  if (!discovery.manifest) {
+    return null;
+  }
+
+  return {
+    root: discovery.root,
+    relativePath: ".",
+    name: typeof discovery.manifest.data.name === "string" ? discovery.manifest.data.name : null,
+    private: discovery.manifest.data.private === true,
+    manifestPath: discovery.manifest.path,
+    source: "root"
+  };
+}
+
+function addSelectedTarget(
+  targets: Map<string, WorkspaceRunTarget>,
+  skipped: Map<string, WorkspaceRunTarget>,
+  target: WorkspaceRunTarget,
+  includePrivate: boolean
+): void {
+  if (target.private && !includePrivate) {
+    if (!targets.has(target.root)) {
+      skipped.set(target.root, target);
+    }
+    return;
+  }
+
+  skipped.delete(target.root);
+  targets.set(target.root, target);
+}
+
+function matchesWorkspaceSelector(target: WorkspaceRunTarget, selector: string): boolean {
+  return target.name === selector || normalizeSelector(target.relativePath) === selector;
+}
+
+function normalizeSelector(value: string): string {
+  return normalizePatternText(value).replace(/\/$/, "");
+}
+
+function compareTargets(left: WorkspaceRunTarget, right: WorkspaceRunTarget): number {
+  if (left.relativePath === "." && right.relativePath !== ".") {
+    return -1;
+  }
+
+  if (right.relativePath === "." && left.relativePath !== ".") {
+    return 1;
+  }
+
+  return left.relativePath.localeCompare(right.relativePath);
+}
+
+function workspaceSelectorNotFoundFinding(selector: string): Finding {
+  return {
+    id: "workspace.selector-not-found",
+    severity: "error",
+    title: "Workspace selector did not match any packages",
+    message: `No workspace package matched ${JSON.stringify(selector)}.`,
+    suggestion: "Use a workspace package name or repository-relative package path."
   };
 }
 

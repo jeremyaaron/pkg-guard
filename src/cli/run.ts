@@ -4,6 +4,7 @@ import { applyFixPlans, planFixes, renderFixPlanHuman, renderFixPlanJson } from 
 import { createReport, getExitCode, type Finding } from "../core/findings.js";
 import { applyFindingPolicy } from "../core/policy.js";
 import { initReleaseWorkflow, renderInitReleaseHuman, renderInitReleaseJson } from "../core/release.js";
+import { discoverWorkspaces, selectWorkspaceTargets } from "../core/workspaces.js";
 import { renderHumanReport } from "../reporters/human.js";
 import { renderJsonReport } from "../reporters/json.js";
 import { getCommandHelpText, getHelpText } from "./help.js";
@@ -44,8 +45,7 @@ export async function runCli(args: string[], io: CliIO): Promise<number> {
 
 async function runCommand(options: ParsedOptions, io: CliIO): Promise<number> {
   if (hasWorkspaceOption(options)) {
-    io.stderr.write("Workspace options are not implemented yet.\n");
-    return 2;
+    return await runWorkspaceSelectionStub(options, io);
   }
 
   if (options.command === "init") {
@@ -120,6 +120,30 @@ async function runFixCommand(options: ParsedOptions, io: CliIO): Promise<number>
   io.stdout.write(options.format === "json" ? renderFixPlanJson(plans, false, result.changedFiles) : renderFixPlanHuman(plans, false));
 
   return getExitCode(findings);
+}
+
+async function runWorkspaceSelectionStub(options: ParsedOptions, io: CliIO): Promise<number> {
+  const discovery = await discoverWorkspaces(options.cwd);
+  const selection = selectWorkspaceTargets(discovery, {
+    workspaces: options.workspaces,
+    selectors: options.workspace,
+    includePrivate: options.includePrivate,
+    includeRoot: options.includeRoot
+  });
+  const blockingFindings = [...discovery.findings, ...selection.findings].filter((finding) => finding.severity === "error");
+
+  if (blockingFindings.length > 0) {
+    for (const finding of blockingFindings) {
+      io.stderr.write(`${finding.id}: ${finding.message}\n`);
+    }
+
+    return 2;
+  }
+
+  io.stderr.write(
+    `Workspace target selection matched ${selection.targets.length} package(s) and skipped ${selection.skipped.length} package(s); batch execution is not implemented yet.\n`
+  );
+  return 2;
 }
 
 function hasWorkspaceOption(options: ParsedOptions): boolean {

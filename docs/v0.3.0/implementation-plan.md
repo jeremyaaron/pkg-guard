@@ -144,7 +144,25 @@ Acceptance criteria:
 
 Status:
 
-- Pending.
+- Completed on 2026-06-24.
+- Added `src/core/workspaces.ts` for workspace metadata discovery.
+- Reads workspace patterns from `package.json` `workspaces`, `package.json` `workspaces.packages`, and `pnpm-workspace.yaml` `packages`.
+- Supports literal relative package paths, complete-segment `*` patterns, scoped layouts such as `packages/@scope/*`, and negated patterns.
+- Rejects unsafe or unsupported patterns such as paths outside the workspace root and recursive `**` patterns with `workspace.pattern-unsupported`.
+- Ignores `node_modules`, VCS directories, package manager stores, coverage directories, and hidden directories during wildcard expansion.
+- Deduplicates package roots and returns them sorted by repository-relative path.
+- Reads package name and `private: true` metadata for discovered packages.
+- Reports invalid root workspace config with `workspace.config-invalid`.
+- Reports invalid workspace package manifests with `workspace.package-json-invalid` and skips those packages.
+- Documented workspace finding IDs in `docs/checks.md`.
+- Added `tests/workspaces.test.ts` coverage for package.json workspaces, `workspaces.packages`, pnpm workspace YAML, private metadata, scoped layouts, negated patterns, deduplication, path escape prevention, unsupported recursive patterns, invalid manifests, invalid config, and ignored directories.
+- Workspace discovery is intentionally not wired into CLI target selection until Phase 3.
+- `npm test -- tests/workspaces.test.ts` passed: 12 tests.
+- `npm run typecheck` passed.
+- `npm test` passed: 148 tests across 13 test files.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed with no issues.
 
 ## Phase 3: Workspace Target Selection
 

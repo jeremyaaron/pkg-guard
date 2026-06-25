@@ -17,6 +17,15 @@ npx pkg-guard check --ignore dependencies.runtime-in-dev
 | `config.invalid` | error | Invalid `pkgGuard` config makes suppression and strictness ambiguous. |
 | `pack.inspect-failed` | warning | Package contents could not be inspected with `npm pack --dry-run --json --ignore-scripts`. |
 
+## Workspaces
+
+| ID | Default | Rationale |
+| --- | --- | --- |
+| `workspace.config-invalid` | error | Invalid workspace metadata prevents reliable package selection. |
+| `workspace.pattern-unsupported` | warning | Unsupported workspace patterns cannot be expanded safely. |
+| `workspace.package-json-invalid` | warning | Invalid workspace package manifests are skipped during workspace discovery. |
+| `workspace.selector-not-found` | error | Explicit workspace selectors should fail when no package matches. |
+
 ## Manifest
 
 | ID | Default | Rationale |

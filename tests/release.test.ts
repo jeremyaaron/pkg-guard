@@ -27,6 +27,7 @@ describe("init-release", () => {
     expect(workflow).toContain('tags:\n      - "v*"');
     expect(workflow).toContain("id-token: write");
     expect(workflow).toContain('node-version: "24"');
+    expect(workflow).toContain("- run: npm install -g npm@^11.5.1");
     expect(workflow).toContain("- run: npm ci");
     expect(workflow).toContain("- run: npm test --if-present");
     expect(workflow).toContain("- run: npm run build --if-present");

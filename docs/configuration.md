@@ -38,3 +38,34 @@ npx pkg-guard check --strict
 ```
 
 Use `ignore` for intentional project-specific exceptions. Prefer fixing errors over suppressing them.
+
+## Workspace Config
+
+Workspace execution is package-local. When you run `pkg-guard check --workspaces`, `pkg-guard` discovers workspace packages from the root, then runs normal package discovery and checks inside each selected package.
+
+Each selected package uses only its own `package.json` `pkgGuard` config. The workspace root config is not silently inherited by child packages. This keeps findings explainable when packages have different publish targets, presets, or suppressions.
+
+To share policy across packages, either:
+
+- add the same `pkgGuard` config to each package that needs it
+- pass one-off CLI flags such as `--ignore <id>` or `--strict` from the workspace command
+
+Workspace selection skips packages with `private: true` by default:
+
+```sh
+npx pkg-guard check --workspaces
+```
+
+Include private packages only when you intentionally want to audit them:
+
+```sh
+npx pkg-guard check --workspaces --include-private
+```
+
+The workspace root is also excluded by default. Include it explicitly:
+
+```sh
+npx pkg-guard check --workspaces --include-root
+```
+
+If the root package has `private: true`, combine `--include-root` with `--include-private`.

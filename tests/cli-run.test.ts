@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -12,6 +12,16 @@ describe("runCli", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("pkg-guard <command>");
     expect(result.stdout).toContain("check");
+    expect(result.stdout).toContain("init");
+    expect(result.stdout).toContain("--format <name>");
+  });
+
+  it("prints init help", async () => {
+    const result = await invoke(["init", "--help"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("pkg-guard init");
+    expect(result.stdout).toContain("--workspaces");
   });
 
   it("returns usage errors for unknown commands", async () => {
@@ -46,6 +56,19 @@ describe("runCli", () => {
     expect(report.command).toBe("check");
     expect(report.summary).toEqual({ errors: 0, warnings: 0, info: 0 });
     expect(report.findings).toEqual([]);
+  });
+
+  it("prints check JSON through the format option", async () => {
+    const fixture = await createPackageFixture();
+    const result = await invoke(["check", "--format", "json"], fixture);
+    const report = JSON.parse(result.stdout) as {
+      schemaVersion: number;
+      command: string;
+    };
+
+    expect(result.exitCode).toBe(0);
+    expect(report.schemaVersion).toBe(1);
+    expect(report.command).toBe("check");
   });
 
   it("runs fix as a command shell", async () => {
@@ -98,7 +121,206 @@ describe("runCli", () => {
     const result = await invoke(["check", "--dry-run"]);
 
     expect(result.exitCode).toBe(2);
-    expect(result.stderr).toContain("--dry-run is only supported by fix");
+    expect(result.stderr).toContain("--dry-run is only supported by fix and init");
+  });
+
+  it("rejects unsupported output formats", async () => {
+    const result = await invoke(["check", "--format", "xml"]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("Unsupported output format: xml");
+  });
+
+  it("rejects sarif output for commands other than check", async () => {
+    const result = await invoke(["fix", "--format", "sarif"]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("--format sarif is only supported by check");
+  });
+
+  it("prints check SARIF output", async () => {
+    const fixture = await createPackageFixture();
+    const result = await invoke(["check", "--format", "sarif"], fixture);
+    const report = JSON.parse(result.stdout) as {
+      version: string;
+      runs: Array<{ tool: { driver: { name: string } }; results: unknown[] }>;
+    };
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(report.version).toBe("2.1.0");
+    expect(report.runs[0]?.tool.driver.name).toBe("pkg-guard");
+    expect(report.runs[0]?.results).toEqual([]);
+  });
+
+  it("rejects workspace options for init-release", async () => {
+    const result = await invoke(["init-release", "--workspaces"]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("Workspace options are not supported by init-release");
+  });
+
+  it("rejects include flags without a workspace selector", async () => {
+    const result = await invoke(["check", "--include-private"]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("--include-private and --include-root require --workspaces or --workspace");
+  });
+
+  it("rejects conflicting workspace selection options", async () => {
+    const result = await invoke(["check", "--workspaces", "--workspace", "packages/a"]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("--workspaces and --workspace cannot be used together");
+  });
+
+  it("runs workspace checks with a temporary batch summary", async () => {
+    const fixture = await createPackageFixture({
+      workspaces: ["packages/*"]
+    });
+    await writePackageJson(join(fixture, "packages", "a", "package.json"), {
+      name: "a",
+      version: "1.0.0",
+      license: "MIT",
+      packageManager: "npm@10.8.2",
+      files: ["dist"]
+    });
+    await writeFile(join(fixture, "packages", "a", "README.md"), "# A\n");
+    await writeFile(join(fixture, "packages", "a", "LICENSE"), "MIT\n");
+    const result = await invoke(["check", "--workspaces"], fixture);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("pkg-guard checked 1 package and skipped 0 packages");
+    expect(result.stdout).toContain("packages/a (a)");
+    expect(result.stdout).toContain("no issues");
+  });
+
+  it("returns a failing workspace exit code when any package has an error", async () => {
+    const fixture = await createPackageFixture({
+      workspaces: ["packages/*"]
+    });
+    await writePackageJson(join(fixture, "packages", "a", "package.json"), {
+      name: "a",
+      version: "1.0.0",
+      license: "MIT",
+      packageManager: "npm@10.8.2",
+      files: ["dist"],
+      main: "./missing.js"
+    });
+    await writePackageJson(join(fixture, "packages", "b", "package.json"), {
+      name: "b",
+      version: "1.0.0",
+      license: "MIT",
+      packageManager: "npm@10.8.2",
+      files: ["dist"]
+    });
+    await writeFile(join(fixture, "packages", "a", "README.md"), "# A\n");
+    await writeFile(join(fixture, "packages", "a", "LICENSE"), "MIT\n");
+    await writeFile(join(fixture, "packages", "b", "README.md"), "# B\n");
+    await writeFile(join(fixture, "packages", "b", "LICENSE"), "MIT\n");
+    const result = await invoke(["check", "--workspaces"], fixture);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toContain("packages/a (a)");
+    expect(result.stdout).toContain("entrypoint.target-missing");
+    expect(result.stdout).toContain("packages/b (b)");
+    expect(result.stdout).toContain("no issues");
+  });
+
+  it("prints workspace JSON output", async () => {
+    const fixture = await createPackageFixture({
+      workspaces: ["packages/*"]
+    });
+    await writePackageJson(join(fixture, "packages", "a", "package.json"), {
+      name: "a",
+      version: "1.0.0",
+      license: "MIT",
+      packageManager: "npm@10.8.2",
+      files: ["dist"]
+    });
+    await writeFile(join(fixture, "packages", "a", "README.md"), "# A\n");
+    await writeFile(join(fixture, "packages", "a", "LICENSE"), "MIT\n");
+    const result = await invoke(["check", "--workspaces", "--format", "json"], fixture);
+    const report = JSON.parse(result.stdout) as {
+      schemaVersion: number;
+      summary: { packages: number; skipped: number; errors: number; warnings: number; info: number };
+      packages: Array<{ name: string | null; relativePath: string; private: boolean; report: unknown }>;
+      findings: unknown[];
+    };
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(report.schemaVersion).toBe(1);
+    expect(report.summary).toEqual({ packages: 1, skipped: 0, errors: 0, warnings: 0, info: 0 });
+    expect(report.packages[0]).toMatchObject({
+      name: "a",
+      relativePath: "packages/a",
+      private: false
+    });
+    expect(report.findings).toEqual([]);
+  });
+
+  it("prints workspace SARIF output", async () => {
+    const fixture = await createPackageFixture({
+      workspaces: ["packages/*"]
+    });
+    await writePackageJson(join(fixture, "packages", "a", "package.json"), {
+      name: "a",
+      version: "1.0.0",
+      license: "MIT",
+      packageManager: "npm@10.8.2",
+      files: ["dist"],
+      main: "./missing.js"
+    });
+    await writeFile(join(fixture, "packages", "a", "README.md"), "# A\n");
+    await writeFile(join(fixture, "packages", "a", "LICENSE"), "MIT\n");
+    const result = await invoke(["check", "--workspaces", "--format", "sarif"], fixture);
+    const report = JSON.parse(result.stdout) as {
+      version: string;
+      runs: Array<{ results: Array<{ ruleId: string; locations?: Array<{ physicalLocation: { artifactLocation: { uri: string } } }> }> }>;
+    };
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toBe("");
+    expect(report.version).toBe("2.1.0");
+    expect(report.runs[0]?.results[0]).toMatchObject({
+      ruleId: "entrypoint.target-missing",
+      locations: [
+        {
+          physicalLocation: {
+            artifactLocation: {
+              uri: "packages/a/package.json"
+            }
+          }
+        }
+      ]
+    });
+  });
+
+  it("reports missing workspace selectors before batch execution", async () => {
+    const fixture = await createPackageFixture({
+      workspaces: ["packages/*"]
+    });
+    await writePackageJson(join(fixture, "packages", "a", "package.json"), {
+      name: "a",
+      version: "1.0.0"
+    });
+    const result = await invoke(["check", "--workspace", "missing"], fixture);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("workspace.selector-not-found");
+    expect(result.stderr).toContain('No workspace package matched "missing".');
+  });
+
+  it("runs init as a command shell", async () => {
+    const fixture = await createPackageFixture();
+    const result = await invoke(["init", "--dry-run"], fixture);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("pkg-guard planned 1 init change");
+    expect(result.stdout).toContain("init.check-script");
   });
 });
 
@@ -129,26 +351,25 @@ async function invoke(args: string[], cwd = "/repo"): Promise<{
   return { exitCode, stdout, stderr };
 }
 
-async function createPackageFixture(): Promise<string> {
+async function createPackageFixture(overrides: Record<string, unknown> = {}): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "pkg-guard-package-"));
 
-  await writeFile(
-    join(root, "package.json"),
-    `${JSON.stringify(
-      {
-        name: "fixture",
-        version: "1.0.0",
-        license: "MIT",
-        packageManager: "npm@10.8.2",
-        files: ["dist"]
-      },
-      null,
-      2
-    )}\n`
-  );
+  await writePackageJson(join(root, "package.json"), {
+    name: "fixture",
+    version: "1.0.0",
+    license: "MIT",
+    packageManager: "npm@10.8.2",
+    files: ["dist"],
+    ...overrides
+  });
   await writeFile(join(root, "package-lock.json"), "{}\n");
   await writeFile(join(root, "README.md"), "# Fixture\n");
   await writeFile(join(root, "LICENSE"), "MIT\n");
 
   return root;
+}
+
+async function writePackageJson(filePath: string, data: Record<string, unknown>): Promise<void> {
+  await mkdir(join(filePath, ".."), { recursive: true });
+  await writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`);
 }

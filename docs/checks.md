@@ -17,6 +17,15 @@ npx pkg-guard check --ignore dependencies.runtime-in-dev
 | `config.invalid` | error | Invalid `pkgGuard` config makes suppression and strictness ambiguous. |
 | `pack.inspect-failed` | warning | Package contents could not be inspected with `npm pack --dry-run --json --ignore-scripts`. |
 
+## Workspaces
+
+| ID | Default | Rationale |
+| --- | --- | --- |
+| `workspace.config-invalid` | error | Invalid workspace metadata prevents reliable package selection. |
+| `workspace.pattern-unsupported` | warning | Unsupported workspace patterns cannot be expanded safely. |
+| `workspace.package-json-invalid` | warning | Invalid workspace package manifests are skipped during workspace discovery. |
+| `workspace.selector-not-found` | error | Explicit workspace selectors should fail when no package matches. |
+
 ## Manifest
 
 | ID | Default | Rationale |
@@ -84,7 +93,9 @@ Workflow validation recognizes direct GitHub Actions `run:` commands and validat
 | `workflow.long-lived-npm-token` | warning | npm trusted publishing avoids long-lived npm automation tokens. |
 | `workflow.id-token-permission-missing` | warning | Trusted publishing requires GitHub Actions OIDC permission. |
 | `workflow.branch-push-publish` | error | Publishing on ordinary branch pushes is risky. |
-| `workflow.self-hosted-trusted-publishing` | warning | Self-hosted runners need extra trust review when used with npm trusted publishing. |
+| `workflow.self-hosted-trusted-publishing` | warning | npm trusted publishing currently requires supported hosted runners. |
+| `workflow.node-version-too-old` | warning | npm trusted publishing requires Node 22.14.0 or higher. |
+| `workflow.npm-version-too-old` | warning | npm trusted publishing requires npm CLI 11.5.1 or later. |
 | `workflow.publish-access-missing` | warning | Scoped packages should publish with explicit npm access. |
 | `workflow.publish-access-mismatch` | warning | Publish workflow access should match `publishConfig.access` when configured. |
 | `workflow.install-step-missing` | warning | Publish workflows should install dependencies before publishing. |

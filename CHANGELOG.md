@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0
+
+- Adds workspace-aware `check`, `fix`, and `init` flows with `--workspaces`, `--workspace <selector>`, `--include-private`, and `--include-root`.
+- Discovers workspace packages from `package.json` workspace fields and `pnpm-workspace.yaml`, with stable workspace discovery findings for invalid config, unsupported patterns, invalid package manifests, and unmatched selectors.
+- Skips private workspace packages by default while allowing explicit audits with `--include-private`.
+- Adds workspace human and JSON reports that show package labels, skipped packages, and package-local findings.
+- Adds SARIF output for `pkg-guard check --format sarif`, including workspace SARIF paths suitable for CI upload.
+- Adds `pkg-guard init` to create conservative `pkg:check` scripts and inferred package intent config, including workspace-root initialization.
+- Adds workspace-aware fix planning, with `fix --workspaces --dry-run` for batch previews and `fix --workspace <selector>` for selected-package apply.
+- Refreshes trusted publishing generation and checks for current npm requirements: generated workflows use Node `24` and install `npm@^11.5.1`, old static Node/npm versions warn, and self-hosted runner guidance reflects npm trusted publishing support.
+
 ## 0.2.0
 
 - Makes package intent operational with `generic`, `typescript-library`, and `cli` presets. `pkg-guard` infers a preset by default and allows `pkgGuard.preset` overrides.

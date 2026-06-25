@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta
       name="description"
-      content="pkg-guard is a TypeScript CLI that checks npm package manifests, entrypoints, tarballs, lifecycle scripts, and release workflows before publishing."
+      content="pkg-guard is a TypeScript CLI that checks npm package manifests, entrypoints, tarballs, lifecycle scripts, workspaces, SARIF CI output, and release workflows before publishing."
     >
     <title>pkg-guard | npm package publishing hygiene</title>
     <link rel="stylesheet" href="styles.css">
@@ -18,6 +18,7 @@
       </a>
       <nav class="nav" aria-label="Primary navigation">
         <a href="#checks">Checks</a>
+        <a href="#workspaces">Workspaces</a>
         <a href="#workflow">Release</a>
         <a href="#install">Install</a>
         <a href="https://github.com/jeremyaaron/pkg-guard">GitHub</a>
@@ -33,7 +34,7 @@
           <p class="hero-copy">
             <span>Find broken entrypoints.</span>
             <span>Catch bad tarballs.</span>
-            <span>Review lifecycle scripts and release workflows.</span>
+            <span>Check workspaces, lifecycle scripts, and release workflows.</span>
           </p>
           <div class="hero-actions" aria-label="Primary actions">
             <a class="button button-primary" href="#install">Install</a>
@@ -49,7 +50,7 @@
         </div>
         <div class="signal">
           <span class="signal-value">1</span>
-          <span class="signal-label">CLI command in CI</span>
+          <span class="signal-label">workspace-aware CI gate</span>
         </div>
         <div class="signal">
           <span class="signal-value">7</span>
@@ -62,7 +63,7 @@
           <p class="eyebrow">Checks</p>
           <h2 id="checks-title">A practical preflight for package releases.</h2>
           <p>
-            `pkg-guard check` inspects the files and metadata that consumers actually rely on: the manifest, declared entrypoints, packed tarball contents, lifecycle scripts, TypeScript declarations, dependency ranges, and npm publish workflows.
+            `pkg-guard check` inspects the files and metadata that consumers actually rely on: the manifest, declared entrypoints, packed tarball contents, lifecycle scripts, TypeScript declarations, dependency ranges, workspaces, and npm publish workflows.
           </p>
         </div>
         <div class="feature-grid">
@@ -86,6 +87,26 @@
             <h3>Checks shaped to the package.</h3>
             <p>Infer CLI, TypeScript library, or generic intent so package-specific findings stay useful and suppressible.</p>
           </article>
+          <article class="feature">
+            <span class="feature-kicker">Workspaces</span>
+            <h3>Publishable packages checked together.</h3>
+            <p>Run across npm and pnpm workspace layouts, skip private packages by default, and target one package by name or path.</p>
+          </article>
+          <article class="feature">
+            <span class="feature-kicker">CI</span>
+            <h3>Human, JSON, and SARIF output.</h3>
+            <p>Use concise local output, structured automation output, or SARIF for code scanning style CI ingestion.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="workspaces" aria-labelledby="workspaces-title">
+        <div class="section-heading">
+          <p class="eyebrow">Workspaces</p>
+          <h2 id="workspaces-title">One pass across every package you publish.</h2>
+          <p>
+            Run `pkg-guard check --workspaces` from the repository root to audit publishable workspace packages. Private packages are skipped unless explicitly included, and package-local config stays package-local.
+          </p>
         </div>
       </section>
 
@@ -99,14 +120,14 @@
             </p>
           </div>
           <div class="command-panel" aria-label="Example command output">
-            <div class="command-line">$ npx pkg-guard check</div>
+            <div class="command-line">$ npx pkg-guard check --workspaces</div>
             <ol class="check-list">
               <li><span class="ok"></span> manifest metadata</li>
               <li><span class="ok"></span> entrypoint targets</li>
               <li><span class="ok"></span> packed package contents</li>
               <li><span class="ok"></span> lifecycle scripts</li>
               <li><span class="ok"></span> declaration settings</li>
-              <li><span class="ok"></span> release workflow posture</li>
+              <li><span class="ok"></span> workspace and release workflow posture</li>
             </ol>
           </div>
         </div>
@@ -119,8 +140,9 @@
         </div>
         <div class="install-grid">
           <pre><code>npm install -D pkg-guard
-npx pkg-guard check</code></pre>
+npx pkg-guard check --workspaces</code></pre>
           <pre><code>npx pkg-guard fix --dry-run
+npx pkg-guard init --dry-run
 npx pkg-guard init-release</code></pre>
         </div>
       </section>

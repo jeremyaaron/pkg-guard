@@ -1,4 +1,4 @@
-import { getBatchExitCode, runBatchChecks } from "../core/batch.js";
+import { getBatchExitCode, getBatchFixExitCode, runBatchChecks, runBatchFixes } from "../core/batch.js";
 import { discoverProject } from "../core/discovery.js";
 import { runChecks } from "../core/checks.js";
 import { applyFixPlans, planFixes, renderFixPlanHuman, renderFixPlanJson } from "../core/fixes.js";
@@ -6,7 +6,7 @@ import { createReport, getExitCode, type Finding } from "../core/findings.js";
 import { applyFindingPolicy } from "../core/policy.js";
 import { initReleaseWorkflow, renderInitReleaseHuman, renderInitReleaseJson } from "../core/release.js";
 import { discoverWorkspaces, selectWorkspaceTargets } from "../core/workspaces.js";
-import { renderBatchHumanReport, renderBatchJsonReport } from "../reporters/batch.js";
+import { renderBatchFixHumanReport, renderBatchFixJsonReport, renderBatchHumanReport, renderBatchJsonReport } from "../reporters/batch.js";
 import { renderHumanReport } from "../reporters/human.js";
 import { renderJsonReport } from "../reporters/json.js";
 import { renderBatchSarifReport, renderSarifReport } from "../reporters/sarif.js";
@@ -122,8 +122,13 @@ async function runFixCommand(options: ParsedOptions, io: CliIO): Promise<number>
 }
 
 async function runWorkspaceCommand(options: ParsedOptions, io: CliIO): Promise<number> {
-  if (options.command !== "check") {
-    io.stderr.write("Workspace execution is only implemented for check in this phase.\n");
+  if (options.command !== "check" && options.command !== "fix") {
+    io.stderr.write("Workspace execution is only implemented for check and fix in this phase.\n");
+    return 2;
+  }
+
+  if (options.command === "fix" && options.workspaces && !options.dryRun) {
+    io.stderr.write("fix --workspaces requires --dry-run; use --workspace <selector> to apply fixes to selected packages.\n");
     return 2;
   }
 
@@ -142,6 +147,22 @@ async function runWorkspaceCommand(options: ParsedOptions, io: CliIO): Promise<n
     }
 
     return 2;
+  }
+
+  if (options.command === "fix") {
+    const report = await runBatchFixes({
+      cwd: options.cwd,
+      root: discovery.root,
+      targets: selection.targets,
+      skipped: selection.skipped,
+      findings: discovery.findings,
+      ignore: options.ignore,
+      strict: options.strict,
+      dryRun: options.dryRun
+    });
+
+    io.stdout.write(options.format === "json" ? renderBatchFixJsonReport(report) : renderBatchFixHumanReport(report));
+    return getBatchFixExitCode(report);
   }
 
   const report = await runBatchChecks({

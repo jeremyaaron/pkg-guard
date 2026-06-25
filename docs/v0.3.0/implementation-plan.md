@@ -402,7 +402,25 @@ Acceptance criteria:
 
 Status:
 
-- Pending.
+- Completed on 2026-06-24.
+- Added batch fix support to `src/core/batch.ts`.
+- Added package-level fix reports with findings, fix plans, and changed files grouped by workspace target.
+- Added aggregate batch fix summaries with package, skipped, fix, changed-file, and finding counts.
+- Added batch fix human and JSON renderers in `src/reporters/batch.ts`.
+- `pkg-guard fix --workspaces --dry-run` now plans fixes across selected publishable workspace packages without writing.
+- `pkg-guard fix --workspace <selector>` can apply fixes to selected workspace packages.
+- `pkg-guard fix --workspaces` without `--dry-run` returns exit code `2` with a clear safety message.
+- Workspace fix JSON output includes package metadata, package findings, changed files, and fix plans.
+- Existing single-package fix behavior remains unchanged.
+- Added CLI fix tests for workspace dry-run, selected workspace apply, all-workspace apply rejection, and workspace fix JSON output.
+- `npm test -- tests/fixes.test.ts tests/cli-run.test.ts tests/reporters.test.ts` passed: 47 tests across 3 test files.
+- `npm run typecheck` passed.
+- `npm test` passed: 172 tests across 14 test files.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed with no issues.
+- `node dist/cli/index.js fix --workspaces --dry-run` passed in this non-workspace repo with no fixable workspace issues.
+- `node dist/cli/index.js fix --workspaces` returned the expected exit code `2` safety message.
 
 ## Phase 8: Adoption Init Command
 

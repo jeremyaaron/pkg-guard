@@ -368,7 +368,125 @@ describe("pkg-guard fix", () => {
       expect.arrayContaining(["fix.files", "fix.publish-access", "fix.engines-node", "fix.side-effects"])
     );
   });
+
+  it("previews workspace fixes without writing", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "workspace-root",
+        version: "1.0.0",
+        private: true,
+        workspaces: ["packages/*"]
+      },
+      files: {
+        "packages/a/package.json": `${JSON.stringify(packageJson({ name: "a" }), null, 2)}\n`,
+        "packages/a/dist/index.js": "export {};\n",
+        "packages/a/README.md": "# A\n",
+        "packages/a/LICENSE": "MIT\n"
+      }
+    });
+
+    const result = await invoke(["fix", "--workspaces", "--dry-run"], root);
+    const manifest = await readManifest(join(root, "packages", "a"));
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("pkg-guard planned 1 fix across 1 package");
+    expect(result.stdout).toContain("packages/a (a)");
+    expect(result.stdout).toContain("fix.files");
+    expect(manifest.files).toBeUndefined();
+  });
+
+  it("applies fixes only to selected workspace packages", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "workspace-root",
+        version: "1.0.0",
+        private: true,
+        workspaces: ["packages/*"]
+      },
+      files: {
+        "packages/a/package.json": `${JSON.stringify(packageJson({ name: "a" }), null, 2)}\n`,
+        "packages/a/dist/index.js": "export {};\n",
+        "packages/a/README.md": "# A\n",
+        "packages/a/LICENSE": "MIT\n",
+        "packages/b/package.json": `${JSON.stringify(packageJson({ name: "b" }), null, 2)}\n`,
+        "packages/b/dist/index.js": "export {};\n",
+        "packages/b/README.md": "# B\n",
+        "packages/b/LICENSE": "MIT\n"
+      }
+    });
+
+    const result = await invoke(["fix", "--workspace", "packages/a"], root);
+    const manifestA = await readManifest(join(root, "packages", "a"));
+    const manifestB = await readManifest(join(root, "packages", "b"));
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("pkg-guard applied 1 fix across 1 package");
+    expect(result.stdout).toContain("changed package.json");
+    expect(manifestA.files).toEqual(["dist", "README.md", "LICENSE"]);
+    expect(manifestB.files).toBeUndefined();
+  });
+
+  it("rejects applying fixes to all workspaces without dry-run", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "workspace-root",
+        version: "1.0.0",
+        private: true,
+        workspaces: ["packages/*"]
+      }
+    });
+
+    const result = await invoke(["fix", "--workspaces"], root);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("fix --workspaces requires --dry-run");
+  });
+
+  it("prints workspace fix JSON output", async () => {
+    const root = await createFixture({
+      packageJson: {
+        name: "workspace-root",
+        version: "1.0.0",
+        private: true,
+        workspaces: ["packages/*"]
+      },
+      files: {
+        "packages/a/package.json": `${JSON.stringify(packageJson({ name: "a" }), null, 2)}\n`,
+        "packages/a/dist/index.js": "export {};\n",
+        "packages/a/README.md": "# A\n",
+        "packages/a/LICENSE": "MIT\n"
+      }
+    });
+
+    const result = await invoke(["fix", "--workspaces", "--dry-run", "--format", "json"], root);
+    const json = JSON.parse(result.stdout) as {
+      command: string;
+      dryRun: boolean;
+      summary: { packages: number; fixes: number; changedFiles: number };
+      packages: Array<{ relativePath: string; fixes: Array<{ id: string }>; changedFiles: string[] }>;
+    };
+
+    expect(result.exitCode).toBe(0);
+    expect(json.command).toBe("fix");
+    expect(json.dryRun).toBe(true);
+    expect(json.summary).toMatchObject({ packages: 1, fixes: 1, changedFiles: 0 });
+    expect(json.packages[0]).toMatchObject({
+      relativePath: "packages/a",
+      fixes: [expect.objectContaining({ id: "fix.files" })],
+      changedFiles: []
+    });
+  });
 });
+
+function packageJson(overrides: Record<string, unknown>): Record<string, unknown> {
+  return {
+    name: "fixture",
+    version: "1.0.0",
+    license: "MIT",
+    packageManager: "npm@10.8.2",
+    ...overrides
+  };
+}
 
 async function invoke(args: string[], cwd: string): Promise<{
   exitCode: number;

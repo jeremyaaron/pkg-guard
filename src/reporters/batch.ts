@@ -1,4 +1,4 @@
-import type { BatchCheckReport, PackageCheckReport } from "../core/batch.js";
+import type { BatchCheckReport, BatchFixReport, PackageCheckReport, PackageFixReport } from "../core/batch.js";
 import type { Finding, Severity } from "../core/findings.js";
 
 const severityOrder: Severity[] = ["error", "warning", "info"];
@@ -57,7 +57,79 @@ export function renderBatchJsonReport(report: BatchCheckReport): string {
   )}\n`;
 }
 
+export function renderBatchFixHumanReport(report: BatchFixReport): string {
+  if (report.summary.fixes === 0) {
+    return `pkg-guard found no fixable workspace issues\n`;
+  }
+
+  let heading = report.dryRun
+    ? `pkg-guard planned ${formatCount(report.summary.fixes, "fix")} across ${formatCount(report.summary.packages, "package")}`
+    : `pkg-guard applied ${formatCount(report.summary.fixes, "fix")} across ${formatCount(report.summary.packages, "package")}`;
+
+  if (report.summary.skipped > 0) {
+    heading += ` and skipped ${formatCount(report.summary.skipped, "package")}`;
+  }
+
+  const lines = [heading];
+
+  for (const packageReport of report.packages.filter((item) => item.fixes.length > 0 || item.changedFiles.length > 0)) {
+    lines.push("", formatFixPackageLabel(packageReport));
+
+    for (const fix of packageReport.fixes) {
+      lines.push(`${report.dryRun ? "  plan" : "  fix"} ${fix.id}`);
+      lines.push(`    ${fix.description}`);
+
+      for (const operation of fix.operations) {
+        lines.push(`    ${operation.path} = ${JSON.stringify(operation.value)}`);
+      }
+    }
+
+    for (const changedFile of packageReport.changedFiles) {
+      lines.push(`  changed ${changedFile}`);
+    }
+  }
+
+  return `${lines.join("\n").trimEnd()}\n`;
+}
+
+export function renderBatchFixJsonReport(report: BatchFixReport): string {
+  return `${JSON.stringify(
+    {
+      schemaVersion: report.schemaVersion,
+      command: report.command,
+      dryRun: report.dryRun,
+      cwd: report.cwd,
+      root: report.root,
+      summary: report.summary,
+      findings: report.findings,
+      packages: report.packages.map((packageReport) => ({
+        name: packageReport.target.name,
+        relativePath: packageReport.target.relativePath,
+        private: packageReport.target.private,
+        source: packageReport.target.source,
+        findings: packageReport.findings,
+        changedFiles: packageReport.changedFiles,
+        fixes: packageReport.fixes
+      })),
+      skipped: report.skipped.map((target) => ({
+        name: target.name,
+        relativePath: target.relativePath,
+        private: target.private,
+        source: target.source
+      }))
+    },
+    null,
+    2
+  )}\n`;
+}
+
 function formatPackageLabel(packageReport: PackageCheckReport): string {
+  return packageReport.target.name
+    ? `${packageReport.target.relativePath} (${packageReport.target.name})`
+    : packageReport.target.relativePath;
+}
+
+function formatFixPackageLabel(packageReport: PackageFixReport): string {
   return packageReport.target.name
     ? `${packageReport.target.relativePath} (${packageReport.target.name})`
     : packageReport.target.relativePath;

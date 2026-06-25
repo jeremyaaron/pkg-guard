@@ -167,20 +167,68 @@ describe("runCli", () => {
     expect(result.stderr).toContain("--workspaces and --workspace cannot be used together");
   });
 
-  it("parses workspace options but reports the later phase stub", async () => {
+  it("runs workspace checks with a temporary batch summary", async () => {
     const fixture = await createPackageFixture({
       workspaces: ["packages/*"]
     });
     await writePackageJson(join(fixture, "packages", "a", "package.json"), {
       name: "a",
-      version: "1.0.0"
+      version: "1.0.0",
+      license: "MIT",
+      packageManager: "npm@10.8.2",
+      files: ["dist"]
     });
+    await writeFile(join(fixture, "packages", "a", "README.md"), "# A\n");
+    await writeFile(join(fixture, "packages", "a", "LICENSE"), "MIT\n");
     const result = await invoke(["check", "--workspaces"], fixture);
 
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("pkg-guard checked 1 package and skipped 0 packages");
+    expect(result.stdout).toContain("packages/a (a)");
+    expect(result.stdout).toContain("no issues");
+  });
+
+  it("returns a failing workspace exit code when any package has an error", async () => {
+    const fixture = await createPackageFixture({
+      workspaces: ["packages/*"]
+    });
+    await writePackageJson(join(fixture, "packages", "a", "package.json"), {
+      name: "a",
+      version: "1.0.0",
+      license: "MIT",
+      packageManager: "npm@10.8.2",
+      files: ["dist"],
+      main: "./missing.js"
+    });
+    await writePackageJson(join(fixture, "packages", "b", "package.json"), {
+      name: "b",
+      version: "1.0.0",
+      license: "MIT",
+      packageManager: "npm@10.8.2",
+      files: ["dist"]
+    });
+    await writeFile(join(fixture, "packages", "a", "README.md"), "# A\n");
+    await writeFile(join(fixture, "packages", "a", "LICENSE"), "MIT\n");
+    await writeFile(join(fixture, "packages", "b", "README.md"), "# B\n");
+    await writeFile(join(fixture, "packages", "b", "LICENSE"), "MIT\n");
+    const result = await invoke(["check", "--workspaces"], fixture);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toContain("packages/a (a)");
+    expect(result.stdout).toContain("entrypoint.target-missing");
+    expect(result.stdout).toContain("packages/b (b)");
+    expect(result.stdout).toContain("no issues");
+  });
+
+  it("keeps workspace JSON output as a later phase boundary", async () => {
+    const fixture = await createPackageFixture({
+      workspaces: ["packages/*"]
+    });
+    const result = await invoke(["check", "--workspaces", "--format", "json"], fixture);
+
     expect(result.exitCode).toBe(2);
-    expect(result.stderr).toBe(
-      "Workspace target selection matched 1 package(s) and skipped 0 package(s); batch execution is not implemented yet.\n"
-    );
+    expect(result.stderr).toBe("Workspace JSON output is not implemented yet.\n");
   });
 
   it("reports missing workspace selectors before batch execution", async () => {

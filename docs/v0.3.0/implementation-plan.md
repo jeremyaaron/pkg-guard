@@ -251,7 +251,24 @@ Acceptance criteria:
 
 Status:
 
-- Pending.
+- Completed on 2026-06-24.
+- Added `src/core/batch.ts` with `runBatchChecks`, package-level reports, batch summaries, skipped package tracking, and aggregate exit-code calculation.
+- Batch checks build one existing `ProjectContext` per selected workspace target and reuse the existing check registry.
+- Package-level `pkgGuard.ignore` and `pkgGuard.strict` are applied independently per package.
+- CLI `--ignore` and `--strict` are applied across all checked packages.
+- A package with findings does not stop later selected packages from being checked.
+- Workspace `check` now runs batch checks in human mode and returns `1` when any checked package has an error.
+- Workspace `check --format json` remains an explicit Phase 5 boundary.
+- Workspace `check --format sarif` remains an explicit Phase 6 boundary.
+- Added batch tests for multi-package execution, continuing after errors, package-level ignore, CLI ignore, and package-level strict policy.
+- Updated CLI tests for real workspace check execution, aggregate failure exit codes, and the JSON later-phase boundary.
+- `npm test -- tests/batch.test.ts tests/cli-run.test.ts tests/workspaces.test.ts` passed: 46 tests across 3 test files.
+- `npm run typecheck` passed.
+- `npm test` passed: 163 tests across 14 test files.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed with no issues.
+- `node dist/cli/index.js check --workspaces` passed in this non-workspace repo with 0 checked packages and 0 skipped packages.
 
 ## Phase 5: Human and JSON Batch Reporting
 

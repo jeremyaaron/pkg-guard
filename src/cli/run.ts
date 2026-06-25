@@ -1,3 +1,4 @@
+import { getBatchExitCode, runBatchChecks, type BatchCheckReport } from "../core/batch.js";
 import { discoverProject } from "../core/discovery.js";
 import { runChecks } from "../core/checks.js";
 import { applyFixPlans, planFixes, renderFixPlanHuman, renderFixPlanJson } from "../core/fixes.js";
@@ -45,7 +46,7 @@ export async function runCli(args: string[], io: CliIO): Promise<number> {
 
 async function runCommand(options: ParsedOptions, io: CliIO): Promise<number> {
   if (hasWorkspaceOption(options)) {
-    return await runWorkspaceSelectionStub(options, io);
+    return await runWorkspaceCommand(options, io);
   }
 
   if (options.command === "init") {
@@ -122,7 +123,22 @@ async function runFixCommand(options: ParsedOptions, io: CliIO): Promise<number>
   return getExitCode(findings);
 }
 
-async function runWorkspaceSelectionStub(options: ParsedOptions, io: CliIO): Promise<number> {
+async function runWorkspaceCommand(options: ParsedOptions, io: CliIO): Promise<number> {
+  if (options.command !== "check") {
+    io.stderr.write("Workspace execution is only implemented for check in this phase.\n");
+    return 2;
+  }
+
+  if (options.format === "json") {
+    io.stderr.write("Workspace JSON output is not implemented yet.\n");
+    return 2;
+  }
+
+  if (options.format === "sarif") {
+    io.stderr.write("SARIF output is not implemented yet.\n");
+    return 2;
+  }
+
   const discovery = await discoverWorkspaces(options.cwd);
   const selection = selectWorkspaceTargets(discovery, {
     workspaces: options.workspaces,
@@ -140,10 +156,51 @@ async function runWorkspaceSelectionStub(options: ParsedOptions, io: CliIO): Pro
     return 2;
   }
 
-  io.stderr.write(
-    `Workspace target selection matched ${selection.targets.length} package(s) and skipped ${selection.skipped.length} package(s); batch execution is not implemented yet.\n`
-  );
-  return 2;
+  const report = await runBatchChecks({
+    command: "check",
+    cwd: options.cwd,
+    root: discovery.root,
+    targets: selection.targets,
+    skipped: selection.skipped,
+    findings: discovery.findings,
+    ignore: options.ignore,
+    strict: options.strict
+  });
+
+  io.stdout.write(renderWorkspaceCheckSummary(report));
+  return getBatchExitCode(report);
+}
+
+function renderWorkspaceCheckSummary(report: BatchCheckReport): string {
+  const lines = [
+    `pkg-guard checked ${formatCount(report.summary.packages, "package")} and skipped ${formatCount(report.summary.skipped, "package")}`
+  ];
+
+  for (const packageReport of report.packages) {
+    const findings = packageReport.report.findings;
+    const label = packageReport.target.name
+      ? `${packageReport.target.relativePath} (${packageReport.target.name})`
+      : packageReport.target.relativePath;
+
+    lines.push("", label);
+
+    if (findings.length === 0) {
+      lines.push("  no issues");
+      continue;
+    }
+
+    for (const finding of findings) {
+      lines.push(`  ${finding.severity} ${finding.id}: ${finding.message}`);
+    }
+  }
+
+  lines.push("", `summary: ${report.summary.errors} errors, ${report.summary.warnings} warnings, ${report.summary.info} info`);
+
+  return `${lines.join("\n")}\n`;
+}
+
+function formatCount(count: number, noun: string): string {
+  return `${count} ${count === 1 ? noun : `${noun}s`}`;
 }
 
 function hasWorkspaceOption(options: ParsedOptions): boolean {

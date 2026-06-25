@@ -12,6 +12,16 @@ describe("runCli", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("pkg-guard <command>");
     expect(result.stdout).toContain("check");
+    expect(result.stdout).toContain("init");
+    expect(result.stdout).toContain("--format <name>");
+  });
+
+  it("prints init help", async () => {
+    const result = await invoke(["init", "--help"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("pkg-guard init");
+    expect(result.stdout).toContain("--workspaces");
   });
 
   it("returns usage errors for unknown commands", async () => {
@@ -46,6 +56,19 @@ describe("runCli", () => {
     expect(report.command).toBe("check");
     expect(report.summary).toEqual({ errors: 0, warnings: 0, info: 0 });
     expect(report.findings).toEqual([]);
+  });
+
+  it("prints check JSON through the format option", async () => {
+    const fixture = await createPackageFixture();
+    const result = await invoke(["check", "--format", "json"], fixture);
+    const report = JSON.parse(result.stdout) as {
+      schemaVersion: number;
+      command: string;
+    };
+
+    expect(result.exitCode).toBe(0);
+    expect(report.schemaVersion).toBe(1);
+    expect(report.command).toBe("check");
   });
 
   it("runs fix as a command shell", async () => {
@@ -98,7 +121,66 @@ describe("runCli", () => {
     const result = await invoke(["check", "--dry-run"]);
 
     expect(result.exitCode).toBe(2);
-    expect(result.stderr).toContain("--dry-run is only supported by fix");
+    expect(result.stderr).toContain("--dry-run is only supported by fix and init");
+  });
+
+  it("rejects unsupported output formats", async () => {
+    const result = await invoke(["check", "--format", "xml"]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("Unsupported output format: xml");
+  });
+
+  it("rejects sarif output for commands other than check", async () => {
+    const result = await invoke(["fix", "--format", "sarif"]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("--format sarif is only supported by check");
+  });
+
+  it("parses sarif output for check but reports the later phase stub", async () => {
+    const fixture = await createPackageFixture();
+    const result = await invoke(["check", "--format", "sarif"], fixture);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toBe("SARIF output is not implemented yet.\n");
+  });
+
+  it("rejects workspace options for init-release", async () => {
+    const result = await invoke(["init-release", "--workspaces"]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("Workspace options are not supported by init-release");
+  });
+
+  it("rejects include flags without a workspace selector", async () => {
+    const result = await invoke(["check", "--include-private"]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("--include-private and --include-root require --workspaces or --workspace");
+  });
+
+  it("rejects conflicting workspace selection options", async () => {
+    const result = await invoke(["check", "--workspaces", "--workspace", "packages/a"]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("--workspaces and --workspace cannot be used together");
+  });
+
+  it("parses workspace options but reports the later phase stub", async () => {
+    const fixture = await createPackageFixture();
+    const result = await invoke(["check", "--workspaces"], fixture);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toBe("Workspace options are not implemented yet.\n");
+  });
+
+  it("parses init but reports the later phase stub", async () => {
+    const fixture = await createPackageFixture();
+    const result = await invoke(["init", "--dry-run"], fixture);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toBe("pkg-guard init is not implemented yet.\n");
   });
 });
 

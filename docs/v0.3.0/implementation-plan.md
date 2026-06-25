@@ -85,7 +85,23 @@ Acceptance criteria:
 
 Status:
 
-- Pending.
+- Completed on 2026-06-24.
+- Added `init` to the command parser and command help.
+- Added parsed options for `--workspaces`, `--workspace <selector>`, `--include-private`, `--include-root`, and `--format <human|json|sarif>`.
+- Kept `--json` as an alias for `--format json`.
+- Added validation for invalid formats, missing option values, conflicting workspace selectors, include flags without workspace selection, SARIF on non-`check` commands, and workspace flags on `init-release`.
+- Left later-phase surfaces intentionally stubbed at runtime: workspace modes, SARIF check output, and `init` return clear exit code `2` messages until their implementation phases.
+- Updated help output for the new command and options.
+- Added CLI coverage for new parsing and validation behavior.
+- `npm test -- tests/cli-run.test.ts` passed: 19 tests.
+- `npm run typecheck` passed.
+- `npm test` passed: 136 tests across 12 test files.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed with no issues.
+- `node dist/cli/index.js check --format json` passed.
+- `node dist/cli/index.js init --help` passed.
+- `node dist/cli/index.js fix --format sarif` returned the expected usage error.
 
 ## Phase 2: Workspace Discovery
 

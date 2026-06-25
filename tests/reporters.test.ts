@@ -5,6 +5,7 @@ import { createReport, getExitCode } from "../src/core/findings.js";
 import { renderBatchHumanReport, renderBatchJsonReport } from "../src/reporters/batch.js";
 import { renderHumanReport } from "../src/reporters/human.js";
 import { renderJsonReport } from "../src/reporters/json.js";
+import { renderBatchSarifReport, renderSarifReport } from "../src/reporters/sarif.js";
 
 describe("reporters", () => {
   const findings = [
@@ -97,6 +98,89 @@ describe("reporters", () => {
       source: "workspace"
     });
   });
+
+  it("renders SARIF output", () => {
+    const report = createReport("check", "/repo", findings);
+    const parsed = JSON.parse(renderSarifReport(report)) as {
+      version: string;
+      runs: Array<{
+        tool: { driver: { name: string; informationUri: string; rules: Array<{ id: string }> } };
+        results: Array<{
+          ruleId: string;
+          level: string;
+          locations?: Array<{ physicalLocation: { artifactLocation: { uri: string } } }>;
+          properties?: Record<string, unknown>;
+        }>;
+      }>;
+    };
+
+    expect(parsed.version).toBe("2.1.0");
+    expect(parsed.runs[0]?.tool.driver).toMatchObject({
+      name: "pkg-guard",
+      informationUri: "https://github.com/jeremyaaron/pkg-guard"
+    });
+    expect(parsed.runs[0]?.tool.driver.rules.map((rule) => rule.id)).toEqual([
+      "manifest.name-missing",
+      "package.package-manager-missing",
+      "project.package-manager-detected"
+    ]);
+    expect(parsed.runs[0]?.results[0]).toMatchObject({
+      ruleId: "manifest.name-missing",
+      level: "error",
+      locations: [
+        {
+          physicalLocation: {
+            artifactLocation: {
+              uri: "package.json"
+            }
+          }
+        }
+      ],
+      properties: {
+        jsonPath: "$.name",
+        suggestion: "Add a valid package name.",
+        fixable: true
+      }
+    });
+    expect(parsed.runs[0]?.results[1]).toMatchObject({
+      ruleId: "package.package-manager-missing",
+      level: "warning"
+    });
+    expect(parsed.runs[0]?.results[2]).toMatchObject({
+      ruleId: "project.package-manager-detected",
+      level: "note"
+    });
+  });
+
+  it("renders batch SARIF output with workspace package paths", () => {
+    const report = createBatchReport();
+    const parsed = JSON.parse(renderBatchSarifReport(report)) as {
+      runs: Array<{
+        results: Array<{
+          ruleId: string;
+          locations?: Array<{ physicalLocation: { artifactLocation: { uri: string } } }>;
+        }>;
+      }>;
+    };
+
+    expect(parsed.runs[0]?.results).toEqual([
+      expect.objectContaining({
+        ruleId: "workspace.pattern-unsupported"
+      }),
+      expect.objectContaining({
+        ruleId: "entrypoint.target-missing",
+        locations: [
+          {
+            physicalLocation: {
+              artifactLocation: {
+                uri: "packages/a/package.json"
+              }
+            }
+          }
+        ]
+      })
+    ]);
+  });
 });
 
 function createBatchReport(): BatchCheckReport {
@@ -104,7 +188,9 @@ function createBatchReport(): BatchCheckReport {
     id: "entrypoint.target-missing",
     severity: "error" as const,
     title: "Entry point target does not exist",
-    message: "main target does not exist."
+    message: "main target does not exist.",
+    file: "package.json",
+    path: "$.main"
   };
   const workspaceFinding = {
     id: "workspace.pattern-unsupported",

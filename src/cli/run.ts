@@ -9,6 +9,7 @@ import { discoverWorkspaces, selectWorkspaceTargets } from "../core/workspaces.j
 import { renderBatchHumanReport, renderBatchJsonReport } from "../reporters/batch.js";
 import { renderHumanReport } from "../reporters/human.js";
 import { renderJsonReport } from "../reporters/json.js";
+import { renderBatchSarifReport, renderSarifReport } from "../reporters/sarif.js";
 import { getCommandHelpText, getHelpText } from "./help.js";
 import { parseArgs, type ParsedOptions } from "./options.js";
 
@@ -55,11 +56,6 @@ async function runCommand(options: ParsedOptions, io: CliIO): Promise<number> {
     return 2;
   }
 
-  if (options.format === "sarif") {
-    io.stderr.write("SARIF output is not implemented yet.\n");
-    return 2;
-  }
-
   if (options.command === "fix") {
     return await runFixCommand(options, io);
   }
@@ -70,7 +66,8 @@ async function runCommand(options: ParsedOptions, io: CliIO): Promise<number> {
 
   const findings = await getCommandFindings(options);
   const report = createReport(options.command, options.cwd, findings);
-  const output = options.format === "json" ? renderJsonReport(report) : renderHumanReport(report);
+  const output =
+    options.format === "json" ? renderJsonReport(report) : options.format === "sarif" ? renderSarifReport(report) : renderHumanReport(report);
 
   io.stdout.write(output);
   return getExitCode(findings);
@@ -130,11 +127,6 @@ async function runWorkspaceCommand(options: ParsedOptions, io: CliIO): Promise<n
     return 2;
   }
 
-  if (options.format === "sarif") {
-    io.stderr.write("SARIF output is not implemented yet.\n");
-    return 2;
-  }
-
   const discovery = await discoverWorkspaces(options.cwd);
   const selection = selectWorkspaceTargets(discovery, {
     workspaces: options.workspaces,
@@ -163,7 +155,13 @@ async function runWorkspaceCommand(options: ParsedOptions, io: CliIO): Promise<n
     strict: options.strict
   });
 
-  io.stdout.write(options.format === "json" ? renderBatchJsonReport(report) : renderBatchHumanReport(report));
+  io.stdout.write(
+    options.format === "json"
+      ? renderBatchJsonReport(report)
+      : options.format === "sarif"
+        ? renderBatchSarifReport(report)
+        : renderBatchHumanReport(report)
+  );
   return getBatchExitCode(report);
 }
 

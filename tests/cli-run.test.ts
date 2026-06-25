@@ -138,12 +138,19 @@ describe("runCli", () => {
     expect(result.stderr).toContain("--format sarif is only supported by check");
   });
 
-  it("parses sarif output for check but reports the later phase stub", async () => {
+  it("prints check SARIF output", async () => {
     const fixture = await createPackageFixture();
     const result = await invoke(["check", "--format", "sarif"], fixture);
+    const report = JSON.parse(result.stdout) as {
+      version: string;
+      runs: Array<{ tool: { driver: { name: string } }; results: unknown[] }>;
+    };
 
-    expect(result.exitCode).toBe(2);
-    expect(result.stderr).toBe("SARIF output is not implemented yet.\n");
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(report.version).toBe("2.1.0");
+    expect(report.runs[0]?.tool.driver.name).toBe("pkg-guard");
+    expect(report.runs[0]?.results).toEqual([]);
   });
 
   it("rejects workspace options for init-release", async () => {
@@ -252,6 +259,43 @@ describe("runCli", () => {
       private: false
     });
     expect(report.findings).toEqual([]);
+  });
+
+  it("prints workspace SARIF output", async () => {
+    const fixture = await createPackageFixture({
+      workspaces: ["packages/*"]
+    });
+    await writePackageJson(join(fixture, "packages", "a", "package.json"), {
+      name: "a",
+      version: "1.0.0",
+      license: "MIT",
+      packageManager: "npm@10.8.2",
+      files: ["dist"],
+      main: "./missing.js"
+    });
+    await writeFile(join(fixture, "packages", "a", "README.md"), "# A\n");
+    await writeFile(join(fixture, "packages", "a", "LICENSE"), "MIT\n");
+    const result = await invoke(["check", "--workspaces", "--format", "sarif"], fixture);
+    const report = JSON.parse(result.stdout) as {
+      version: string;
+      runs: Array<{ results: Array<{ ruleId: string; locations?: Array<{ physicalLocation: { artifactLocation: { uri: string } } }> }> }>;
+    };
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toBe("");
+    expect(report.version).toBe("2.1.0");
+    expect(report.runs[0]?.results[0]).toMatchObject({
+      ruleId: "entrypoint.target-missing",
+      locations: [
+        {
+          physicalLocation: {
+            artifactLocation: {
+              uri: "packages/a/package.json"
+            }
+          }
+        }
+      ]
+    });
   });
 
   it("reports missing workspace selectors before batch execution", async () => {

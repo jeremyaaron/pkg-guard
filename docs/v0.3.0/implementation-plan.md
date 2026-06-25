@@ -352,7 +352,26 @@ Acceptance criteria:
 
 Status:
 
-- Pending.
+- Completed on 2026-06-24.
+- Added `src/reporters/sarif.ts` with hand-built SARIF 2.1.0 output and no new runtime dependency.
+- Added SARIF output for single-package `pkg-guard check --format sarif`.
+- Added SARIF output for workspace `pkg-guard check --workspaces --format sarif`.
+- Maps finding IDs to SARIF `ruleId` values and tool driver rules.
+- Maps severities to SARIF levels: error, warning, and note.
+- Includes stable `pkg-guard` tool metadata and GitHub repository information URI.
+- Emits artifact locations for findings with files.
+- Prefixes workspace package finding URIs with the package relative path.
+- Includes finding JSON paths, suggestions, and fixability in SARIF result properties when present.
+- Added reporter tests for single-package SARIF and workspace SARIF package paths.
+- Updated CLI tests for single-package and workspace SARIF output.
+- `npm test -- tests/reporters.test.ts tests/cli-run.test.ts` passed: 30 tests across 2 test files.
+- `npm run typecheck` passed.
+- `npm test` passed: 168 tests across 14 test files.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check --format sarif` passed and emitted SARIF 2.1.0.
+- `node dist/cli/index.js check --workspaces --format sarif` passed and emitted SARIF 2.1.0.
+- `node dist/cli/index.js check` passed with no issues.
 
 ## Phase 7: Workspace Fix Dry-Run and Selected Fix Apply
 

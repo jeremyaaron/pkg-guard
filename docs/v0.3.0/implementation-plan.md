@@ -510,7 +510,21 @@ Acceptance criteria:
 
 Status:
 
-- Pending.
+- Completed on 2026-06-24.
+- Checked the current npm trusted publishing documentation and aligned Phase 9 with npm CLI `11.5.1+`, Node `22.14.0+`, and hosted-provider support.
+- Generated GitHub release workflows now use Node `24` and install `npm@^11.5.1` before dependency installation and publishing.
+- Added `workflow.node-version-too-old` for statically clear `actions/setup-node` versions below Node `22.14.0` in publish jobs.
+- Added `workflow.npm-version-too-old` for statically clear pinned npm CLI versions below `11.5.1` in publish workflows.
+- Unknown or dynamic Node/npm versions remain conservative and do not warn.
+- Strengthened `workflow.self-hosted-trusted-publishing` guidance to note that npm trusted publishing does not currently support self-hosted runners.
+- Documented the new workflow check IDs in `docs/checks.md`.
+- Updated `docs/release-workflow.md` with generated npm update behavior, current Node/npm requirements, and GitHub/GitLab/CircleCI provider notes while keeping generation GitHub-only.
+- `npm test -- tests/workflows.test.ts tests/release.test.ts` passed: 38 tests across 2 test files.
+- `npm run typecheck` passed.
+- `npm test` passed: 183 tests across 15 test files.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed with no issues.
 
 ## Phase 10: Documentation and Examples
 

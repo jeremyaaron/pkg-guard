@@ -1,4 +1,5 @@
 import path from "node:path";
+import { lt as semverLt, parse as parseSemver, type SemVer } from "semver";
 import { parse } from "yaml";
 
 import type { Check } from "../core/checks.js";
@@ -56,6 +57,7 @@ function analyzeWorkflow(workflow: WorkflowInfo, manifest: PackageManifest, pack
     ...checkOidcPermission(analysis),
     ...checkRiskyTriggers(analysis),
     ...checkSelfHostedTrustedPublishing(analysis),
+    ...checkTrustedPublishingRuntimeVersions(analysis),
     ...checkPublishAccess(analysis),
     ...checkRequiredPublishSteps(analysis)
   ];
@@ -164,7 +166,52 @@ function checkSelfHostedTrustedPublishing(analysis: WorkflowAnalysis): Finding[]
       title: "Trusted publishing workflow uses a self-hosted runner",
       message: "This npm publish workflow grants id-token: write and runs a publish job on a self-hosted runner.",
       file: relativeWorkflowPath(analysis.workflow),
-      suggestion: "Use GitHub-hosted runners for npm trusted publishing unless the self-hosted runner setup is intentionally trusted."
+      suggestion: "Use GitHub-hosted runners for npm trusted publishing; npm trusted publishing does not currently support self-hosted runners."
+    }
+  ];
+}
+
+function checkTrustedPublishingRuntimeVersions(analysis: WorkflowAnalysis): Finding[] {
+  return [
+    ...checkNodeVersionForTrustedPublishing(analysis),
+    ...checkNpmVersionForTrustedPublishing(analysis)
+  ];
+}
+
+function checkNodeVersionForTrustedPublishing(analysis: WorkflowAnalysis): Finding[] {
+  const oldVersions = collectPublishJobSetupNodeVersions(analysis.data, analysis.publishSteps).filter(isOldTrustedPublishingNodeVersion);
+
+  if (oldVersions.length === 0) {
+    return [];
+  }
+
+  return [
+    {
+      id: "workflow.node-version-too-old",
+      severity: "warning",
+      title: "Publish workflow uses an old Node version for trusted publishing",
+      message: `This npm publish workflow configures Node ${JSON.stringify(oldVersions[0])}, but npm trusted publishing requires Node 22.14.0 or higher.`,
+      file: relativeWorkflowPath(analysis.workflow),
+      suggestion: 'Use Node "24" or another Node version that satisfies npm trusted publishing requirements.'
+    }
+  ];
+}
+
+function checkNpmVersionForTrustedPublishing(analysis: WorkflowAnalysis): Finding[] {
+  const oldVersions = analysis.stepRuns.flatMap(collectPinnedNpmCliVersions).filter(isOldTrustedPublishingNpmVersion);
+
+  if (oldVersions.length === 0) {
+    return [];
+  }
+
+  return [
+    {
+      id: "workflow.npm-version-too-old",
+      severity: "warning",
+      title: "Publish workflow uses an old npm CLI for trusted publishing",
+      message: `This npm publish workflow pins npm ${JSON.stringify(oldVersions[0])}, but npm trusted publishing requires npm CLI 11.5.1 or later.`,
+      file: relativeWorkflowPath(analysis.workflow),
+      suggestion: "Install npm@^11.5.1 or a newer npm CLI before publishing."
     }
   ];
 }
@@ -314,6 +361,87 @@ function usesSelfHostedRunnerForPublishJob(data: Record<string, unknown>, publis
 
     return job.steps.some((step) => isRecord(step) && typeof step.run === "string" && publishSteps.includes(step.run));
   });
+}
+
+function collectPublishJobSetupNodeVersions(data: Record<string, unknown>, publishSteps: string[]): string[] {
+  if (!isRecord(data.jobs)) {
+    return [];
+  }
+
+  return Object.values(data.jobs).flatMap((job) => {
+    if (!isRecord(job) || !Array.isArray(job.steps)) {
+      return [];
+    }
+
+    const hasPublishStep = job.steps.some((step) => isRecord(step) && typeof step.run === "string" && publishSteps.includes(step.run));
+
+    if (!hasPublishStep) {
+      return [];
+    }
+
+    return job.steps.flatMap((step) => {
+      if (!isRecord(step) || typeof step.uses !== "string" || !/actions\/setup-node@/i.test(step.uses) || !isRecord(step.with)) {
+        return [];
+      }
+
+      const version = step.with["node-version"];
+      return typeof version === "string" ? [version] : [];
+    });
+  });
+}
+
+function isOldTrustedPublishingNodeVersion(value: string): boolean {
+  const version = parseStaticVersion(value);
+
+  if (!version) {
+    return false;
+  }
+
+  if (version.major < 22) {
+    return true;
+  }
+
+  return semverLt(version, "22.14.0");
+}
+
+function collectPinnedNpmCliVersions(command: string): string[] {
+  const normalized = normalizeCommand(command);
+  const versions: string[] = [];
+  const patterns = [
+    /\bnpm\s+(?:install|i)\s+(?:-[^\s]+\s+)*-g\s+npm@([^\s&|;()<>]+)/g,
+    /\bnpm\s+(?:install|i)\s+(?:-[^\s]+\s+)*--global\s+npm@([^\s&|;()<>]+)/g,
+    /\bnpm\s+exec\s+npm@([^\s&|;()<>]+)/g,
+    /\bnpx\s+npm@([^\s&|;()<>]+)/g
+  ];
+
+  for (const pattern of patterns) {
+    for (const match of normalized.matchAll(pattern)) {
+      if (match[1]) {
+        versions.push(match[1]);
+      }
+    }
+  }
+
+  return versions;
+}
+
+function isOldTrustedPublishingNpmVersion(value: string): boolean {
+  const version = parseStaticVersion(value);
+
+  return version ? semverLt(version, "11.5.1") : false;
+}
+
+function parseStaticVersion(value: string): SemVer | null {
+  const trimmed = value.trim().replace(/^v/, "");
+
+  if (!/^\d+(?:\.\d+){0,2}$/.test(trimmed)) {
+    return null;
+  }
+
+  const parts = trimmed.split(".");
+  const normalized = [parts[0], parts[1] ?? "999", parts[2] ?? "999"].join(".");
+
+  return parseSemver(normalized);
 }
 
 function runsOnSelfHosted(value: unknown): boolean {

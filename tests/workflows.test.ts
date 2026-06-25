@@ -281,6 +281,108 @@ jobs:
     expect(ids).toContain("workflow.self-hosted-trusted-publishing");
   });
 
+  it("warns when trusted publishing uses an old Node version", async () => {
+    const root = await createFixture({
+      workflow: `
+name: Release
+on:
+  push:
+    tags:
+      - "v*"
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22.13.0"
+          registry-url: "https://registry.npmjs.org"
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx pkg-guard check
+      - run: npm publish
+`
+    });
+
+    const ids = await getCheckFindingIds(root);
+
+    expect(ids).toContain("workflow.node-version-too-old");
+  });
+
+  it("warns when trusted publishing pins an old npm CLI version", async () => {
+    const root = await createFixture({
+      workflow: `
+name: Release
+on:
+  push:
+    tags:
+      - "v*"
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+      - run: npm install -g npm@11.4.0
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx pkg-guard check
+      - run: npm publish
+`
+    });
+
+    const ids = await getCheckFindingIds(root);
+
+    expect(ids).toContain("workflow.npm-version-too-old");
+  });
+
+  it("does not warn when trusted publishing versions cannot be statically determined", async () => {
+    const root = await createFixture({
+      workflow: `
+name: Release
+on:
+  push:
+    tags:
+      - "v*"
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: \${{ matrix.node }}
+          registry-url: "https://registry.npmjs.org"
+      - run: npm install -g npm@^11.5.1
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx pkg-guard check
+      - run: npm publish
+`
+    });
+
+    const ids = await getCheckFindingIds(root);
+
+    expect(ids).not.toContain("workflow.node-version-too-old");
+    expect(ids).not.toContain("workflow.npm-version-too-old");
+  });
+
   it("reports missing install, test, build, and package validation steps", async () => {
     const root = await createFixture({
       workflow: `

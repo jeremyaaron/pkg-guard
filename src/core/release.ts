@@ -126,6 +126,7 @@ jobs:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
           package-manager-cache: false
+      - run: npm install -g npm@^11.5.1
 ${setupSteps}      - run: ${options.installCommand}
       - run: npm test --if-present
       - run: npm run build --if-present

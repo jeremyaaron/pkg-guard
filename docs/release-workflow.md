@@ -17,16 +17,23 @@ The workflow:
 - publishes from `v*` Git tags
 - grants `id-token: write`
 - uses Node `24`
+- installs npm `^11.5.1`
 - installs dependencies with the detected package manager
 - runs tests and build scripts when present
 - runs `npx pkg-guard check`
 - publishes with an npm command selected from package metadata
 
-Publishing still requires npm-side trusted publisher configuration for the package on npmjs.com. Use:
+Publishing still requires npm-side trusted publisher configuration for the package on npmjs.com. For the generated GitHub Actions workflow, use:
 
 - Provider: GitHub Actions
 - Workflow filename: `release.yml`
 - Trigger: `v*` Git tags
+
+## Trusted Publishing Requirements
+
+npm trusted publishing currently requires npm CLI `11.5.1` or later and Node `22.14.0` or later. The generated GitHub Actions workflow uses Node `24` and updates npm before installing package dependencies.
+
+npm currently supports trusted publishing from GitHub Actions, GitLab CI/CD, and CircleCI. `pkg-guard init-release` generates GitHub Actions only; GitLab and CircleCI projects should adapt the same requirements to their own release pipelines. See the npm trusted publishing documentation: https://docs.npmjs.com/trusted-publishers/
 
 ## Package Managers
 

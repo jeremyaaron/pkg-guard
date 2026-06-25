@@ -10,6 +10,8 @@ The command refuses to overwrite an existing release workflow.
 
 The command also refuses to create a publish workflow when `package.json` has `private: true`.
 
+Workspace options are not supported by `init-release`; generate release workflows package by package.
+
 ## Generated Behavior
 
 The workflow:

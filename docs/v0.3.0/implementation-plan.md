@@ -555,7 +555,21 @@ Acceptance criteria:
 
 Status:
 
-- Pending.
+- Completed on 2026-06-24.
+- Updated `README.md` with workspace usage, SARIF usage, `init`, private-package selection, root inclusion, and package-local config behavior.
+- Reviewed `docs/checks.md`; workspace check IDs and trusted publishing workflow IDs are documented.
+- Updated `docs/configuration.md` to explain package-local workspace config, no silent root inheritance, `--include-private`, and `--include-root`.
+- Updated `docs/examples.md` with single-package CI, workspace CI, SARIF CI, workspace init, workspace fix preview, selected workspace fix, private package inclusion, and private root inclusion examples.
+- Updated `docs/release-workflow.md` to clarify that `init-release` does not accept workspace options and should be run package by package.
+- Added the `0.3.0` changelog entry with workspace, SARIF, init, fix, and trusted publishing behavior.
+- Refreshed the static product site copy for workspace checks and SARIF output.
+- `npm test` passed: 183 tests across 15 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- `node dist/cli/index.js check` passed with no issues.
+- `node dist/cli/index.js check --format sarif > /tmp/pkg-guard-phase10.sarif` passed and produced SARIF `2.1.0`.
+- `node dist/cli/index.js check --workspaces` passed in this non-workspace repo with 0 checked packages and 0 skipped packages.
 
 ## Phase 11: Final Verification and Release Prep
 

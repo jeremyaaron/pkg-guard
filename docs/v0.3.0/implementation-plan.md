@@ -606,4 +606,16 @@ Acceptance criteria:
 
 Status:
 
-- Pending.
+- Completed on 2026-06-24.
+- Pre-bump verification passed on `0.2.0`: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `node dist/cli/index.js check`, SARIF generation, workspace smoke check, and `npm pack --dry-run --json --ignore-scripts`.
+- Pre-bump pack dry-run produced `pkg-guard-0.2.0.tgz` with 127 entries.
+- Bumped `package.json` and `package-lock.json` from `0.2.0` to `0.3.0` using `npm version 0.3.0 --no-git-tag-version`.
+- Confirmed `CHANGELOG.md` includes the `0.3.0` release notes and maps to implemented workspace, SARIF, init, fix, and trusted publishing behavior.
+- Post-bump `npm test` passed: 183 tests across 15 test files.
+- Post-bump `npm run typecheck` passed.
+- Post-bump `npm run lint` passed.
+- Post-bump `npm run build` passed.
+- Post-bump `node dist/cli/index.js check` passed with no issues.
+- Post-bump `node dist/cli/index.js check --format sarif > /tmp/pkg-guard.sarif` passed and produced SARIF `2.1.0`.
+- Post-bump `node dist/cli/index.js check --workspaces` passed in this non-workspace repo with 0 checked packages and 0 skipped packages.
+- Post-bump `npm pack --dry-run --json --ignore-scripts` passed and produced `pkg-guard-0.3.0.tgz` with 127 entries.

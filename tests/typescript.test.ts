@@ -173,6 +173,55 @@ describe("TypeScript checks", () => {
     expect(findings.map((finding) => finding.id)).toContain("typescript.extends-unresolved");
   });
 
+  it("does not infer missing declaration output from an unresolved extended tsconfig", async () => {
+    const root = await createFixture({
+      packageJson: basePackage({
+        main: "./dist/index.js"
+      }),
+      tsconfig: {
+        extends: "./tsconfig.base.json",
+        compilerOptions: {
+          outDir: "dist"
+        }
+      },
+      files: {
+        "dist/index.js": "export {};\n",
+        "tsconfig.base.json": JSON.stringify({ compilerOptions: { declaration: true } })
+      }
+    });
+
+    const ids = (await getCheckFindings(root)).map((finding) => finding.id);
+
+    expect(ids).toContain("typescript.extends-unresolved");
+    expect(ids).not.toContain("typescript.declaration-missing");
+  });
+
+  it("keeps direct TypeScript config findings when tsconfig extends another config", async () => {
+    const root = await createFixture({
+      packageJson: basePackage({
+        main: "./dist/index.js"
+      }),
+      tsconfig: {
+        extends: "./tsconfig.base.json",
+        compilerOptions: {
+          declarationMap: true,
+          outDir: "lib"
+        }
+      },
+      files: {
+        "dist/index.js": "export {};\n",
+        "tsconfig.base.json": "{}\n"
+      }
+    });
+
+    const ids = (await getCheckFindings(root)).map((finding) => finding.id);
+
+    expect(ids).toContain("typescript.extends-unresolved");
+    expect(ids).toContain("typescript.declaration-map-enabled");
+    expect(ids).toContain("typescript.outdir-mismatch");
+    expect(ids).not.toContain("typescript.declaration-missing");
+  });
+
   it("does not require declarations for a bin-only TypeScript package", async () => {
     const root = await createFixture({
       packageJson: basePackage({

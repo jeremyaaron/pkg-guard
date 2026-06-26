@@ -55,7 +55,10 @@ function runTypeScriptChecks(context: ProjectContext): Finding[] {
     return findings;
   }
 
-  findings.push(...checkDeclarationOutput(compilerOptions));
+  if (tsconfig.extends === undefined) {
+    findings.push(...checkDeclarationOutput(compilerOptions));
+  }
+
   findings.push(...checkDeclarationMap(compilerOptions));
   findings.push(...checkOutDirConsistency(context.manifest.data, compilerOptions));
 

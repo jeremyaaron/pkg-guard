@@ -163,7 +163,13 @@ Acceptance criteria:
 
 Status:
 
-- Pending.
+- Completed on 2026-06-25.
+- Kept `typescript.extends-unresolved` for `tsconfig.json` files with `extends`.
+- Suppressed the absence-based `typescript.declaration-missing` check when unresolved `extends` makes inherited declaration settings unknown.
+- Preserved direct-observation checks for local `declarationMap: true` and local `outDir` mismatches.
+- Added regression tests for unresolved `extends` without inferred declaration-missing, plus direct local declaration map and outDir findings under `extends`.
+- `npm test -- tests/typescript.test.ts` passed: 16 tests in 1 test file.
+- `npm run typecheck` passed.
 
 ## Phase 3: Documentation and Changelog
 

@@ -55,7 +55,10 @@ function runTypeScriptChecks(context: ProjectContext): Finding[] {
     return findings;
   }
 
-  findings.push(...checkDeclarationOutput(compilerOptions));
+  if (tsconfig.extends === undefined) {
+    findings.push(...checkDeclarationOutput(compilerOptions));
+  }
+
   findings.push(...checkDeclarationMap(compilerOptions));
   findings.push(...checkOutDirConsistency(context.manifest.data, compilerOptions));
 
@@ -69,7 +72,7 @@ function checkSourceTypes(manifest: PackageManifest): Finding[] {
   ];
 
   return typeTargets.flatMap(({ value, path: jsonPath }) => {
-    if (typeof value !== "string" || !/\.[cm]?tsx?$/.test(value)) {
+    if (typeof value !== "string" || !isTypeScriptSourceTarget(value)) {
       return [];
     }
 
@@ -85,6 +88,10 @@ function checkSourceTypes(manifest: PackageManifest): Finding[] {
       }
     ];
   });
+}
+
+function isTypeScriptSourceTarget(value: string): boolean {
+  return /\.(?:tsx|[cm]?ts)$/.test(value) && !/\.d\.[cm]?ts$/.test(value);
 }
 
 function checkDeclarationOutput(compilerOptions: Record<string, unknown>): Finding[] {

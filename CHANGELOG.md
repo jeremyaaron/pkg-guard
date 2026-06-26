@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1
+
+- Fixes `typescript.types-source-file` so generated declaration targets such as `./dist/index.d.ts`, `.d.cts`, and `.d.mts` are not treated as TypeScript source files.
+- Reduces TypeScript config noise when `tsconfig.json` uses unresolved `extends` by keeping `typescript.extends-unresolved` but suppressing inferred missing-declaration warnings from incomplete local compiler options.
+
 ## 0.3.0
 
 - Adds workspace-aware `check`, `fix`, and `init` flows with `--workspaces`, `--workspace <selector>`, `--include-private`, and `--include-root`.

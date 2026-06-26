@@ -70,9 +70,9 @@ npx pkg-guard check --ignore dependencies.runtime-in-dev
 | ID | Default | Rationale |
 | --- | --- | --- |
 | `typescript.tsconfig-invalid` | warning | Invalid `tsconfig.json` prevents TypeScript-specific analysis. |
-| `typescript.extends-unresolved` | warning | Extended configs are not resolved yet, so findings are conservative. |
-| `typescript.types-source-file` | warning | `types` should usually point at generated `.d.ts` output. |
-| `typescript.declaration-missing` | warning | TypeScript libraries should publish declarations. |
+| `typescript.extends-unresolved` | warning | Extended configs are not resolved yet, so absence-based compiler option findings are conservative. |
+| `typescript.types-source-file` | warning | `types` should point at generated declaration output, not implementation TypeScript source. |
+| `typescript.declaration-missing` | warning | TypeScript libraries should publish declarations when declaration settings can be checked directly. |
 | `typescript.declaration-map-enabled` | warning | Declaration maps may expose source layout or local paths. |
 | `typescript.outdir-mismatch` | warning | Runtime entrypoints should normally point at generated output. |
 

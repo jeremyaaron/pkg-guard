@@ -188,7 +188,13 @@ Acceptance criteria:
 
 Status:
 
-- Pending.
+- Completed on 2026-06-25.
+- Added a `0.3.1` changelog entry for issue #8 declaration target classification and issue #9 unresolved `extends` confidence gating.
+- Updated `docs/checks.md` to clarify that `typescript.types-source-file` targets implementation TypeScript source, not generated declaration files.
+- Updated `docs/checks.md` to clarify that `typescript.declaration-missing` applies when declaration settings can be checked directly.
+- `npm test -- tests/typescript.test.ts` passed: 16 tests in 1 test file.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
 
 ## Phase 4: Final Verification and Release Prep
 

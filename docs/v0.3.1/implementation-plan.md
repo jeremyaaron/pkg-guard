@@ -229,4 +229,20 @@ Acceptance criteria:
 
 Status:
 
-- Pending.
+- Completed on 2026-06-25.
+- Pre-bump `npm test -- tests/typescript.test.ts` passed: 16 tests in 1 test file.
+- Pre-bump `npm test` passed: 192 tests across 15 test files.
+- Pre-bump `npm run typecheck` passed.
+- Pre-bump `npm run lint` passed.
+- Pre-bump `npm run build` passed.
+- Pre-bump `node dist/cli/index.js check` passed with no issues.
+- Pre-bump `npm pack --dry-run --json --ignore-scripts` passed and produced `pkg-guard-0.3.0.tgz` with 128 entries.
+- Bumped `package.json` and `package-lock.json` from `0.3.0` to `0.3.1` using `npm version 0.3.1 --no-git-tag-version`.
+- Confirmed `CHANGELOG.md` includes the `0.3.1` release notes.
+- Post-bump `npm test -- tests/typescript.test.ts` passed: 16 tests in 1 test file.
+- Post-bump `npm test` initially timed out in `tests/batch.test.ts` while running in parallel with other verification commands; isolated rerun passed: 192 tests across 15 test files.
+- Post-bump `npm run typecheck` passed.
+- Post-bump `npm run lint` passed.
+- Post-bump `npm run build` passed.
+- Post-bump `node dist/cli/index.js check` passed with no issues.
+- Post-bump `npm pack --dry-run --json --ignore-scripts` passed and produced `pkg-guard-0.3.1.tgz` with 128 entries.

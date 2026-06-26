@@ -53,6 +53,60 @@ describe("TypeScript checks", () => {
     expect(findings.map((finding) => finding.id)).toContain("typescript.types-source-file");
   });
 
+  it.each([
+    ["types", "./dist/index.d.ts"],
+    ["typings", "./dist/index.d.cts"],
+    ["types", "./dist/index.d.mts"]
+  ])("does not warn when %s metadata points to generated declarations", async (field, declarationTarget) => {
+    const root = await createFixture({
+      packageJson: basePackage({
+        main: "./dist/index.js",
+        [field]: declarationTarget
+      }),
+      tsconfig: {
+        compilerOptions: {
+          declaration: true,
+          outDir: "dist"
+        }
+      },
+      files: {
+        "dist/index.js": "export {};\n"
+      }
+    });
+
+    const findings = await getCheckFindings(root);
+
+    expect(findings.map((finding) => finding.id)).not.toContain("typescript.types-source-file");
+  });
+
+  it.each([
+    ["./src/index.ts"],
+    ["./src/index.tsx"],
+    ["./src/index.mts"],
+    ["./src/index.cts"]
+  ])("warns when types metadata points to implementation source %s", async (typesTarget) => {
+    const root = await createFixture({
+      packageJson: basePackage({
+        main: "./dist/index.js",
+        types: typesTarget,
+        files: ["dist", "src", "README.md", "LICENSE"]
+      }),
+      tsconfig: {
+        compilerOptions: {
+          declaration: true,
+          outDir: "dist"
+        }
+      },
+      files: {
+        "dist/index.js": "export {};\n"
+      }
+    });
+
+    const findings = await getCheckFindings(root);
+
+    expect(findings.map((finding) => finding.id)).toContain("typescript.types-source-file");
+  });
+
   it("warns when declaration maps are enabled", async () => {
     const root = await createFixture({
       packageJson: basePackage({

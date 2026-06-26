@@ -128,7 +128,12 @@ Acceptance criteria:
 
 Status:
 
-- Pending.
+- Completed on 2026-06-25.
+- Added TypeScript tests confirming `types: "./dist/index.d.ts"`, `typings: "./dist/index.d.cts"`, and `types: "./dist/index.d.mts"` do not emit `typescript.types-source-file`.
+- Added TypeScript tests confirming implementation source targets `.ts`, `.tsx`, `.mts`, and `.cts` still emit `typescript.types-source-file`.
+- Updated the TypeScript source-target classifier to exclude declaration files while preserving implementation source warnings.
+- `npm test -- tests/typescript.test.ts` passed: 14 tests in 1 test file.
+- `npm run typecheck` passed.
 
 ## Phase 2: Extended Tsconfig Confidence Gate
 

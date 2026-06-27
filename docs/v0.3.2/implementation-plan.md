@@ -328,4 +328,22 @@ Acceptance criteria:
 
 Status:
 
-- Pending.
+- Completed on 2026-06-27.
+- Pre-bump verification passed:
+  - `npm test -- tests/dependencies.test.ts tests/batch.test.ts tests/cli-run.test.ts` passed: 46 tests across 3 test files.
+  - `npm test` passed: 207 tests across 15 test files.
+  - `npm run typecheck` passed.
+  - `npm run lint` passed.
+  - `npm run build` passed.
+  - `node dist/cli/index.js check` passed with no issues.
+  - `npm pack --dry-run --json --ignore-scripts` passed for `pkg-guard@0.3.1` with 135 entries.
+- Bumped `package.json` and `package-lock.json` from `0.3.1` to `0.3.2` using `npm version 0.3.2 --no-git-tag-version`.
+- Post-bump verification passed:
+  - `npm test -- tests/dependencies.test.ts tests/batch.test.ts tests/cli-run.test.ts` passed: 46 tests across 3 test files.
+  - `npm test` passed: 207 tests across 15 test files.
+  - `npm run typecheck` passed.
+  - `npm run lint` passed.
+  - `npm run build` passed.
+  - `node dist/cli/index.js check` passed with no issues.
+  - `npm pack --dry-run --json --ignore-scripts` passed for `pkg-guard@0.3.2` with 135 entries, package size 128030 bytes, unpacked size 579540 bytes.
+- Confirmed `CHANGELOG.md` includes `0.3.2`.

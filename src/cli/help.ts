@@ -16,6 +16,7 @@ Options:
   --format <name>         Print human, json, or sarif output.
   --json                  Alias for --format json.
   --strict                Upgrade configured strict warnings to errors.
+  --consumer-smoke        Run opt-in consumer resolution checks.
   --ignore <id>           Ignore a check ID for this run.
   --workspaces            Run against workspace packages.
   --workspace <selector>  Run against one workspace package by name or path.
@@ -33,7 +34,7 @@ export function getCommandHelpText(command: string): string {
 Audit the current package.
 
 Usage:
-  pkg-guard check [--format human|json|sarif] [--json] [--strict] [--ignore <id>] [--workspaces] [--workspace <selector>] [--include-private] [--include-root] [--cwd <path>]
+  pkg-guard check [--format human|json|sarif] [--json] [--strict] [--consumer-smoke] [--ignore <id>] [--workspaces] [--workspace <selector>] [--include-private] [--include-root] [--cwd <path>]
 `;
   }
 

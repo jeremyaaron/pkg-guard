@@ -293,6 +293,7 @@ h3 {
   color: #d7dde3;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 15px;
+  overflow-wrap: anywhere;
   padding: 18px 22px;
 }
 

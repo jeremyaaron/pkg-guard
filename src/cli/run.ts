@@ -3,7 +3,8 @@ import type { ProjectContext } from "../core/context.js";
 import { discoverProject } from "../core/discovery.js";
 import { runChecks } from "../core/checks.js";
 import { applyFixPlans, planFixes, renderFixPlanHuman, renderFixPlanJson } from "../core/fixes.js";
-import { createReport, getExitCode, type Finding } from "../core/findings.js";
+import { createReport, getExitCode } from "../core/findings.js";
+import { analyzePackage } from "../core/analysis.js";
 import { applyInitPlans, planInit, renderInitHuman, renderInitJson, type InitPlan } from "../core/init.js";
 import { applyFindingPolicy } from "../core/policy.js";
 import { initReleaseWorkflow, renderInitReleaseHuman, renderInitReleaseJson } from "../core/release.js";
@@ -65,13 +66,19 @@ async function runCommand(options: ParsedOptions, io: CliIO): Promise<number> {
     return await runInitReleaseCommand(options, io);
   }
 
-  const findings = await getCommandFindings(options);
-  const report = createReport(options.command, options.cwd, findings);
+  const analysis = await analyzePackage({
+    command: "check",
+    cwd: options.cwd,
+    ignore: options.ignore,
+    strict: options.strict,
+    consumerSmoke: options.consumerSmoke
+  });
+  const report = createReport(options.command, options.cwd, analysis.findings);
   const output =
     options.format === "json" ? renderJsonReport(report) : options.format === "sarif" ? renderSarifReport(report) : renderHumanReport(report);
 
   io.stdout.write(output);
-  return getExitCode(findings);
+  return getExitCode(analysis.findings);
 }
 
 interface PackageInitReport {
@@ -364,6 +371,7 @@ async function runWorkspaceCommand(options: ParsedOptions, io: CliIO): Promise<n
     findings: discovery.findings,
     ignore: options.ignore,
     strict: options.strict,
+    consumerSmoke: options.consumerSmoke,
     ...(workspaceContext ? { workspaceContext } : {})
   });
 
@@ -379,17 +387,4 @@ async function runWorkspaceCommand(options: ParsedOptions, io: CliIO): Promise<n
 
 function hasWorkspaceOption(options: ParsedOptions): boolean {
   return options.workspaces || options.workspace.length > 0 || options.includePrivate || options.includeRoot;
-}
-
-async function getCommandFindings(options: ParsedOptions): Promise<Finding[]> {
-  const discovery = await discoverProject(options.cwd);
-
-  if (!discovery.context) {
-    return discovery.findings;
-  }
-
-  return applyFindingPolicy([...discovery.findings, ...runChecks(discovery.context)], discovery.context.config, {
-    ignore: options.ignore,
-    strict: options.strict
-  });
 }

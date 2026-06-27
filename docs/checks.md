@@ -62,8 +62,25 @@ npx pkg-guard check --ignore dependencies.runtime-in-dev
 | `pack.junk-file-included` | warning | Cache, coverage, and snapshot files usually do not belong in packages. |
 | `pack.readme-missing` | warning | npm consumers should receive package documentation. |
 | `pack.license-file-missing` | warning | License metadata should be paired with license text. |
-| `pack.entrypoint-missing` | error | Declared targets must be included in the actual tarball. |
+| `pack.entrypoint-missing` | error | Declared targets must be included in the actual npm tarball, not just the source tree. |
 | `pack.unsupported-target` | warning | Some entrypoint shapes cannot yet be checked against pack output. |
+
+Pack checks inspect `npm pack --dry-run --json --ignore-scripts` output. They validate the package artifact contract: what an npm registry consumer would receive in the tarball. `entrypoint.target-missing` means a declared target is missing from the local source tree; `pack.entrypoint-missing` means the declared target exists or is declared, but it is not present in the packed artifact.
+
+## Consumer Smoke
+
+Consumer smoke checks run only when `--consumer-smoke` is passed to `pkg-guard check`. They create an npm tarball, install that tarball into an isolated temporary consumer project with lifecycle scripts disabled, and then run non-executing resolution checks against the installed package.
+
+| ID | Default | Rationale |
+| --- | --- | --- |
+| `consumer.pack-failed` | error | The package could not be packed into an npm tarball for consumer smoke. |
+| `consumer.install-failed` | error | The generated tarball could not be installed by an npm consumer project. |
+| `consumer.require-unresolved` | error | A package target could not be resolved with `require.resolve` after install. |
+| `consumer.import-unresolved` | error | A package target could not be resolved with `import.meta.resolve` after install. |
+| `consumer.bin-unresolved` | error | An installed bin entry is missing or lacks a shebang. |
+| `consumer.types-unresolved` | error | TypeScript could not resolve published declarations from an installed consumer project. |
+
+Consumer smoke uses `npm pack --json --ignore-scripts --pack-destination` and `npm install --ignore-scripts --no-audit --no-fund <tarball>`. It does not execute package modules or CLI bins. Runtime probes use `require.resolve` and `import.meta.resolve`; bin checks read installed files; TypeScript checks use a locally available TypeScript compiler when one can be resolved.
 
 ## TypeScript
 

@@ -9,6 +9,7 @@ export interface ParsedOptions {
   cwd: string;
   ignore: string[];
   strict: boolean;
+  consumerSmoke: boolean;
   workspaces: boolean;
   workspace: string[];
   includePrivate: boolean;
@@ -45,6 +46,7 @@ export function parseArgs(args: string[], cwd: string): ParseResult {
     cwd,
     ignore: [],
     strict: false,
+    consumerSmoke: false,
     workspaces: false,
     workspace: [],
     includePrivate: false,
@@ -83,6 +85,8 @@ export function parseArgs(args: string[], cwd: string): ParseResult {
       options.dryRun = true;
     } else if (arg === "--strict") {
       options.strict = true;
+    } else if (arg === "--consumer-smoke") {
+      options.consumerSmoke = true;
     } else if (arg === "--workspaces") {
       options.workspaces = true;
     } else if (arg === "--workspace") {
@@ -152,6 +156,14 @@ export function parseArgs(args: string[], cwd: string): ParseResult {
       ok: false,
       help: options.command,
       message: "--format sarif is only supported by check"
+    };
+  }
+
+  if (options.command !== "check" && options.consumerSmoke) {
+    return {
+      ok: false,
+      help: options.command,
+      message: "--consumer-smoke is only supported by check"
     };
   }
 

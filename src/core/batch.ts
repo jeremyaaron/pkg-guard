@@ -1,11 +1,6 @@
+import { analyzeWorkspacePackage } from "./analysis.js";
 import { runChecks } from "./checks.js";
-import type {
-  PackageManagerInfo,
-  ProjectContext,
-  WorkflowInfo,
-  WorkspacePackageMetadata,
-  WorkspacePublishPath
-} from "./context.js";
+import type { PackageManagerInfo, WorkflowInfo, WorkspacePackageMetadata, WorkspacePublishPath } from "./context.js";
 import { discoverProject } from "./discovery.js";
 import { applyFixPlans, planFixes, type FixPlan } from "./fixes.js";
 import { createReport, getExitCode, summarizeFindings, type Finding, type FindingSummary, type Report } from "./findings.js";
@@ -30,6 +25,7 @@ export interface BatchCheckOptions {
   findings: Finding[];
   ignore: string[];
   strict: boolean;
+  consumerSmoke?: boolean;
   workspaceContext?: WorkspaceCheckContext;
 }
 
@@ -185,46 +181,19 @@ export function getBatchFixExitCode(report: BatchFixReport): number {
 }
 
 async function runPackageChecks(target: WorkspaceRunTarget, options: BatchCheckOptions): Promise<PackageCheckReport> {
-  const discovery = await discoverProject(target.root);
-  const context = discovery.context ? withWorkspaceContext(discovery.context, target, options.workspaceContext) : null;
-  const findings = context
-    ? applyFindingPolicy([...discovery.findings, ...runChecks(context)], context.config, {
-        ignore: options.ignore,
-        strict: options.strict
-      })
-    : discovery.findings;
+  const analysis = await analyzeWorkspacePackage({
+    command: options.command,
+    cwd: target.root,
+    ignore: options.ignore,
+    strict: options.strict,
+    target,
+    ...(options.consumerSmoke === undefined ? {} : { consumerSmoke: options.consumerSmoke }),
+    ...(options.workspaceContext ? { workspaceContext: options.workspaceContext } : {})
+  });
 
   return {
     target,
-    report: createReport(options.command, target.root, findings)
-  };
-}
-
-function withWorkspaceContext(
-  context: ProjectContext,
-  target: WorkspaceRunTarget,
-  workspaceContext: WorkspaceCheckContext | undefined
-): ProjectContext {
-  if (!workspaceContext) {
-    return context;
-  }
-
-  return {
-    ...context,
-    workspace: {
-      root: workspaceContext.root,
-      packageRoot: target.root,
-      packageRelativePath: target.relativePath,
-      packageName: target.name,
-      packageManager: workspaceContext.packageManager,
-      packagesByName: Object.fromEntries(workspaceContext.packagesByName),
-      publishPath: inferWorkspacePublishPath({
-        packageManager: workspaceContext.packageManager,
-        rootWorkflows: workspaceContext.rootWorkflows,
-        packageWorkflows: context.workflows
-      }),
-      rootWorkflows: workspaceContext.rootWorkflows
-    }
+    report: createReport(options.command, target.root, analysis.findings)
   };
 }
 

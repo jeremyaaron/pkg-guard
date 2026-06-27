@@ -14,6 +14,15 @@ describe("runCli", () => {
     expect(result.stdout).toContain("check");
     expect(result.stdout).toContain("init");
     expect(result.stdout).toContain("--format <name>");
+    expect(result.stdout).toContain("--consumer-smoke");
+  });
+
+  it("prints check help with consumer smoke", async () => {
+    const result = await invoke(["check", "--help"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("pkg-guard check");
+    expect(result.stdout).toContain("--consumer-smoke");
   });
 
   it("prints init help", async () => {
@@ -35,6 +44,15 @@ describe("runCli", () => {
   it("runs check with an empty finding set", async () => {
     const fixture = await createPackageFixture();
     const result = await invoke(["check"], fixture);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe("pkg-guard found no issues\n");
+    expect(result.stderr).toBe("");
+  });
+
+  it("accepts consumer smoke for check without changing behavior yet", async () => {
+    const fixture = await createPackageFixture();
+    const result = await invoke(["check", "--consumer-smoke"], fixture);
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("pkg-guard found no issues\n");
@@ -138,6 +156,17 @@ describe("runCli", () => {
     expect(result.stderr).toContain("--format sarif is only supported by check");
   });
 
+  it.each([
+    ["fix"],
+    ["init"],
+    ["init-release"]
+  ])("rejects consumer smoke for %s", async (command) => {
+    const result = await invoke([command, "--consumer-smoke"]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("--consumer-smoke is only supported by check");
+  });
+
   it("prints check SARIF output", async () => {
     const fixture = await createPackageFixture();
     const result = await invoke(["check", "--format", "sarif"], fixture);
@@ -188,6 +217,28 @@ describe("runCli", () => {
     await writeFile(join(fixture, "packages", "a", "README.md"), "# A\n");
     await writeFile(join(fixture, "packages", "a", "LICENSE"), "MIT\n");
     const result = await invoke(["check", "--workspaces"], fixture);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("pkg-guard checked 1 package and skipped 0 packages");
+    expect(result.stdout).toContain("packages/a (a)");
+    expect(result.stdout).toContain("no issues");
+  });
+
+  it("accepts consumer smoke for workspace checks without changing behavior yet", async () => {
+    const fixture = await createPackageFixture({
+      workspaces: ["packages/*"]
+    });
+    await writePackageJson(join(fixture, "packages", "a", "package.json"), {
+      name: "a",
+      version: "1.0.0",
+      license: "MIT",
+      packageManager: "npm@10.8.2",
+      files: ["dist"]
+    });
+    await writeFile(join(fixture, "packages", "a", "README.md"), "# A\n");
+    await writeFile(join(fixture, "packages", "a", "LICENSE"), "MIT\n");
+    const result = await invoke(["check", "--workspaces", "--consumer-smoke"], fixture);
 
     expect(result.exitCode).toBe(0);
     expect(result.stderr).toBe("");

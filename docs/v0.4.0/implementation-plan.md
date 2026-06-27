@@ -87,7 +87,15 @@ npm run typecheck
 
 Status:
 
-- Pending.
+- Completed on 2026-06-27.
+- Added `consumerSmoke: boolean` to parsed CLI options.
+- Added parsing for `--consumer-smoke`.
+- Restricted `--consumer-smoke` to `check` and added usage errors for `fix`, `init`, and `init-release`.
+- Updated global and `check` help text.
+- Added CLI coverage for single-package acceptance, workspace acceptance, and non-check rejection.
+- No smoke execution behavior was added in this phase.
+- `npm test -- tests/cli-run.test.ts` passed: 32 tests in 1 test file.
+- `npm run typecheck` passed.
 
 ## Phase 2: Shared Package Target Collection
 

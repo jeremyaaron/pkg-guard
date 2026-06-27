@@ -212,7 +212,17 @@ npm run typecheck
 
 Status:
 
-- Pending.
+- Completed on 2026-06-26.
+- Changed `dependencies.workspace-range` analysis to receive the full `ProjectContext`.
+- Preserved single-package conservative behavior when no workspace context exists.
+- Preserved errors for non-pnpm workspace roots and npm/unknown publish paths.
+- Suppressed `dependencies.workspace-range` for pnpm-safe workspace dependencies that resolve to publishable local workspace packages.
+- Added missing-target errors with a targeted suggestion.
+- Added private-target handling: errors for publish-relevant dependency sections and warnings for `devDependencies`.
+- Added focused batch coverage for valid pnpm workspace dependencies, missing targets, private runtime targets, private dev-only targets, npm roots, and pnpm workspaces that publish through npm.
+- `npm test -- tests/dependencies.test.ts tests/batch.test.ts tests/cli-run.test.ts` passed: 43 tests across 3 test files.
+- `npm run typecheck` passed.
+- `npm test` passed: 204 tests across 15 test files.
 
 ## Phase 5: CLI and Reporter Smoke Coverage
 

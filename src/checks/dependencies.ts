@@ -19,27 +19,117 @@ function runDependencyChecks(context: ProjectContext): Finding[] {
   }
 
   return [
-    ...checkWorkspaceRanges(manifest),
+    ...checkWorkspaceRanges(context),
     ...checkKnownRuntimeDevDependencies(manifest),
     ...checkOptionalPeerMetadata(manifest),
     ...checkBroadLibraryRanges(manifest)
   ];
 }
 
-function checkWorkspaceRanges(manifest: PackageManifest): Finding[] {
-  return dependencySections(manifest).flatMap(({ section, dependencies }) =>
+function checkWorkspaceRanges(context: ProjectContext): Finding[] {
+  return dependencySections(context.manifest.data).flatMap(({ section, dependencies }) =>
     Object.entries(dependencies)
       .filter(([, range]) => range.startsWith("workspace:"))
-      .map(([name, range]) => ({
-        id: "dependencies.workspace-range",
-        severity: "error" as const,
-        title: "Workspace dependency range would be published",
-        message: `${section}.${name} uses ${JSON.stringify(range)}.`,
-        file: "package.json",
-        path: `$.${section}.${formatJsonPathKey(name)}`,
-        suggestion: "Replace workspace protocol ranges before publishing this package."
-      }))
+      .flatMap(([name, range]) => evaluateWorkspaceRange(context, section, name, range))
   );
+}
+
+function evaluateWorkspaceRange(
+  context: ProjectContext,
+  section: DependencySectionName,
+  name: string,
+  range: string
+): Finding[] {
+  const base = { section, name, range };
+
+  if (!context.workspace) {
+    return [
+      workspaceRangeFinding(base, {
+        severity: "error",
+        suggestion: "Replace workspace protocol ranges before publishing this package."
+      })
+    ];
+  }
+
+  if (context.workspace.packageManager.detected !== "pnpm") {
+    return [
+      workspaceRangeFinding(base, {
+        severity: "error",
+        messageSuffix: ` Root package manager is ${context.workspace.packageManager.detected}, so pkg-guard cannot prove this range will be rewritten.`,
+        suggestion: "Replace workspace protocol ranges before publishing with this package manager."
+      })
+    ];
+  }
+
+  if (context.workspace.publishPath.kind === "npm") {
+    return [
+      workspaceRangeFinding(base, {
+        severity: "error",
+        messageSuffix: ` ${context.workspace.publishPath.reason}`,
+        suggestion: "Use a pnpm publish path that rewrites workspace protocol ranges, or replace the range before npm publishing."
+      })
+    ];
+  }
+
+  if (context.workspace.publishPath.kind !== "pnpm") {
+    return [
+      workspaceRangeFinding(base, {
+        severity: "error",
+        messageSuffix: ` ${context.workspace.publishPath.reason}`,
+        suggestion: "Replace workspace protocol ranges before publishing with this package manager."
+      })
+    ];
+  }
+
+  const target = context.workspace.packagesByName[name];
+
+  if (!target) {
+    return [
+      workspaceRangeFinding(base, {
+        severity: "error",
+        messageSuffix: " No matching workspace package was found.",
+        suggestion: "Add a matching workspace package or replace the workspace protocol range before publishing."
+      })
+    ];
+  }
+
+  if (target.private) {
+    return [
+      workspaceRangeFinding(base, {
+        severity: section === "devDependencies" ? "warning" : "error",
+        messageSuffix: ` It resolves to private workspace package ${target.relativePath}.`,
+        suggestion:
+          "Do not publish a public package that depends on a private workspace package unless the dependency is removed from published metadata."
+      })
+    ];
+  }
+
+  return [];
+}
+
+interface WorkspaceRangeFindingInput {
+  section: DependencySectionName;
+  name: string;
+  range: string;
+}
+
+function workspaceRangeFinding(
+  input: WorkspaceRangeFindingInput,
+  options: {
+    severity: Finding["severity"];
+    messageSuffix?: string;
+    suggestion: string;
+  }
+): Finding {
+  return {
+    id: "dependencies.workspace-range",
+    severity: options.severity,
+    title: "Workspace dependency range would be published",
+    message: `${input.section}.${input.name} uses ${JSON.stringify(input.range)}.${options.messageSuffix ?? ""}`,
+    file: "package.json",
+    path: `$.${input.section}.${formatJsonPathKey(input.name)}`,
+    suggestion: options.suggestion
+  };
 }
 
 function checkKnownRuntimeDevDependencies(manifest: PackageManifest): Finding[] {
@@ -99,8 +189,10 @@ function checkBroadLibraryRanges(manifest: PackageManifest): Finding[] {
   });
 }
 
+type DependencySectionName = "dependencies" | "devDependencies" | "peerDependencies" | "optionalDependencies";
+
 function dependencySections(manifest: PackageManifest): Array<{
-  section: "dependencies" | "devDependencies" | "peerDependencies" | "optionalDependencies";
+  section: DependencySectionName;
   dependencies: Record<string, string>;
 }> {
   return [

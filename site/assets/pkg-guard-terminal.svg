@@ -7,8 +7,8 @@
   <circle cx="42" cy="39" r="10" fill="#C94A4A"/>
   <circle cx="76" cy="39" r="10" fill="#D89C2D"/>
   <circle cx="110" cy="39" r="10" fill="#4FB67A"/>
-  <text x="640" y="47" text-anchor="middle" fill="#C8D1DA" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="20">pkg-guard check</text>
-  <text x="58" y="142" fill="#DCE5EC" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="30">$ npx pkg-guard check</text>
+  <text x="640" y="47" text-anchor="middle" fill="#C8D1DA" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="20">pkg-guard check --consumer-smoke</text>
+  <text x="58" y="142" fill="#DCE5EC" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="30">$ npx pkg-guard check --consumer-smoke</text>
   <rect x="58" y="190" width="1164" height="88" rx="10" fill="#222A31"/>
   <text x="88" y="244" fill="#F5F8FA" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="28">pkg-guard</text>
   <text x="250" y="244" fill="#83D6A8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="28">0 errors</text>
@@ -21,17 +21,17 @@
     <text x="104" y="418" fill="#EAF0F4">entrypoint targets</text>
     <text x="950" y="418" fill="#8EA0AD">dist/cli/index.js</text>
     <circle cx="74" cy="476" r="9" fill="#53D18F"/>
-    <text x="104" y="484" fill="#EAF0F4">pack contents</text>
+    <text x="104" y="484" fill="#EAF0F4">packed artifact</text>
     <text x="950" y="484" fill="#8EA0AD">npm pack</text>
     <circle cx="74" cy="542" r="9" fill="#53D18F"/>
-    <text x="104" y="550" fill="#EAF0F4">TypeScript declarations</text>
-    <text x="950" y="550" fill="#8EA0AD">tsconfig.json</text>
+    <text x="104" y="550" fill="#EAF0F4">consumer install</text>
+    <text x="950" y="550" fill="#8EA0AD">npm install</text>
     <circle cx="74" cy="608" r="9" fill="#53D18F"/>
-    <text x="104" y="616" fill="#EAF0F4">release workflow</text>
-    <text x="950" y="616" fill="#8EA0AD">OIDC ready</text>
+    <text x="104" y="616" fill="#EAF0F4">runtime resolution</text>
+    <text x="950" y="616" fill="#8EA0AD">import/require</text>
     <circle cx="74" cy="674" r="9" fill="#53D18F"/>
-    <text x="104" y="682" fill="#EAF0F4">dependency ranges</text>
-    <text x="950" y="682" fill="#8EA0AD">publishable</text>
+    <text x="104" y="682" fill="#EAF0F4">bin and declarations</text>
+    <text x="950" y="682" fill="#8EA0AD">installed</text>
   </g>
   <rect x="58" y="730" width="338" height="42" rx="21" fill="#0B5F41"/>
   <text x="88" y="758" fill="#FFFFFF" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="20">ready before publish</text>

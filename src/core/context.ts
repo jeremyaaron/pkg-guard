@@ -9,6 +9,7 @@ export interface ProjectContext {
   workflows: WorkflowInfo[];
   pack: PackInfo | null;
   config: PkgGuardConfig;
+  workspace?: WorkspacePackageContext;
 }
 
 export interface PackageManifestFile {
@@ -76,6 +77,27 @@ export interface LockfileInfo {
   name: PackageManagerName;
   path: string;
 }
+
+export interface WorkspacePackageContext {
+  root: string;
+  packageRoot: string;
+  packageRelativePath: string;
+  packageName: string | null;
+  packageManager: PackageManagerInfo;
+  packagesByName: Record<string, WorkspacePackageMetadata>;
+  publishPath: WorkspacePublishPath;
+}
+
+export interface WorkspacePackageMetadata {
+  name: string;
+  relativePath: string;
+  private: boolean;
+}
+
+export type WorkspacePublishPath =
+  | { kind: "pnpm"; reason: string }
+  | { kind: "npm"; reason: string }
+  | { kind: "unknown"; reason: string };
 
 export interface GitInfo {
   remoteUrl: string | null;

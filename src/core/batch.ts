@@ -1,9 +1,17 @@
 import { runChecks } from "./checks.js";
+import type { PackageManagerInfo, WorkspacePackageMetadata, WorkspacePublishPath } from "./context.js";
 import { discoverProject } from "./discovery.js";
 import { applyFixPlans, planFixes, type FixPlan } from "./fixes.js";
 import { createReport, getExitCode, summarizeFindings, type Finding, type FindingSummary, type Report } from "./findings.js";
 import { applyFindingPolicy } from "./policy.js";
 import type { WorkspaceRunTarget } from "./workspaces.js";
+
+export interface WorkspaceCheckContext {
+  root: string;
+  packageManager: PackageManagerInfo;
+  packagesByName: Map<string, WorkspacePackageMetadata>;
+  publishPath: WorkspacePublishPath;
+}
 
 export interface BatchCheckOptions {
   command: "check";
@@ -14,6 +22,7 @@ export interface BatchCheckOptions {
   findings: Finding[];
   ignore: string[];
   strict: boolean;
+  workspaceContext?: WorkspaceCheckContext;
 }
 
 export interface PackageCheckReport {

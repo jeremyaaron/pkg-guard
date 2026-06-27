@@ -70,7 +70,13 @@ npm test -- tests/batch.test.ts
 
 Status:
 
-- Pending.
+- Completed on 2026-06-26.
+- Added optional `ProjectContext.workspace`.
+- Added `WorkspacePackageContext`, `WorkspacePackageMetadata`, and `WorkspacePublishPath` to `src/core/context.ts`.
+- Added `WorkspaceCheckContext` and optional `BatchCheckOptions.workspaceContext` to `src/core/batch.ts`.
+- No check behavior changes were made in this phase.
+- `npm run typecheck` passed.
+- `npm test -- tests/batch.test.ts` passed: 5 tests in 1 test file.
 
 ## Phase 2: Workspace Context Plumbing
 

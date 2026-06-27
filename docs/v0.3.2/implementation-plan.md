@@ -158,7 +158,16 @@ npm run typecheck
 
 Status:
 
-- Pending.
+- Completed on 2026-06-26.
+- Added `inferWorkspacePublishPath` in `src/core/publish-path.ts`.
+- The helper classifies obvious `npm publish` and `npx semantic-release` workflow commands as `npm`, including both root and package-local workflows.
+- Non-pnpm root package managers classify as `unknown`.
+- pnpm roots with no npm publish workflow classify as `pnpm`.
+- Workspace batch context now uses root-only inference at creation time and recomputes package context with package-local workflows when attaching `context.workspace`.
+- Added focused coverage for pnpm-safe, root npm-publish, package-local npm-publish, semantic-release, and npm-root cases.
+- `npm test -- tests/batch.test.ts tests/workflows.test.ts` passed: 39 tests across 2 test files.
+- `npm run typecheck` passed.
+- `npm test` passed: 198 tests across 15 test files.
 
 ## Phase 4: Workspace-Range Decision Logic
 

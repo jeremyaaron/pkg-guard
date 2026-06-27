@@ -124,7 +124,7 @@ describe("runBatchChecks", () => {
     const context = createWorkspaceCheckContext(discovery);
 
     expect(context?.packageManager.detected).toBe("pnpm");
-    expect(context?.publishPath.kind).toBe("unknown");
+    expect(context?.publishPath.kind).toBe("pnpm");
     expect(context?.rootWorkflows).toHaveLength(1);
     expect(Array.from(context?.packagesByName.keys() ?? [])).toEqual(["@scope/a", "private-package"]);
     expect(context?.packagesByName.get("private-package")).toMatchObject({

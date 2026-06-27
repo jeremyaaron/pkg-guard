@@ -10,6 +10,7 @@ import { discoverProject } from "./discovery.js";
 import { applyFixPlans, planFixes, type FixPlan } from "./fixes.js";
 import { createReport, getExitCode, summarizeFindings, type Finding, type FindingSummary, type Report } from "./findings.js";
 import { applyFindingPolicy } from "./policy.js";
+import { inferWorkspacePublishPath } from "./publish-path.js";
 import type { WorkspaceDiscovery, WorkspaceRunTarget } from "./workspaces.js";
 
 export interface WorkspaceCheckContext {
@@ -139,10 +140,11 @@ export function createWorkspaceCheckContext(discovery: WorkspaceDiscovery): Work
     root: discovery.root,
     packageManager: discovery.packageManager,
     packagesByName,
-    publishPath: {
-      kind: "unknown",
-      reason: "Publish path inference has not run yet."
-    },
+    publishPath: inferWorkspacePublishPath({
+      packageManager: discovery.packageManager,
+      rootWorkflows: discovery.rootWorkflows,
+      packageWorkflows: []
+    }),
     rootWorkflows: discovery.rootWorkflows
   };
 }
@@ -216,7 +218,11 @@ function withWorkspaceContext(
       packageName: target.name,
       packageManager: workspaceContext.packageManager,
       packagesByName: Object.fromEntries(workspaceContext.packagesByName),
-      publishPath: workspaceContext.publishPath,
+      publishPath: inferWorkspacePublishPath({
+        packageManager: workspaceContext.packageManager,
+        rootWorkflows: workspaceContext.rootWorkflows,
+        packageWorkflows: context.workflows
+      }),
       rootWorkflows: workspaceContext.rootWorkflows
     }
   };

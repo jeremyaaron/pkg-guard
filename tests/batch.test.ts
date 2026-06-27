@@ -5,7 +5,7 @@ import { mkdtemp } from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-import { runBatchChecks } from "../src/core/batch.js";
+import { createWorkspaceCheckContext, runBatchChecks } from "../src/core/batch.js";
 import { discoverWorkspaces, selectWorkspaceTargets } from "../src/core/workspaces.js";
 
 describe("runBatchChecks", () => {
@@ -104,7 +104,187 @@ describe("runBatchChecks", () => {
       severity: "warning"
     });
   });
+
+  it("does not report workspace ranges for pnpm-safe publishable workspace dependencies", async () => {
+    const root = await createWorkspaceFixture({
+      rootPackageJson: {
+        packageManager: "pnpm@9.0.0"
+      },
+      packages: {
+        "packages/a": packageJson({
+          name: "@scope/a",
+          dependencies: {
+            "@scope/shared": "workspace:*"
+          }
+        }),
+        "packages/shared": packageJson({ name: "@scope/shared" })
+      }
+    });
+    const report = await runWorkspaceCheck(root);
+
+    expect(getPackageFindingIds(report, "packages/a")).not.toContain("dependencies.workspace-range");
+  });
+
+  it("errors when a pnpm workspace range has no matching workspace package", async () => {
+    const root = await createWorkspaceFixture({
+      rootPackageJson: {
+        packageManager: "pnpm@9.0.0"
+      },
+      packages: {
+        "packages/a": packageJson({
+          name: "@scope/a",
+          dependencies: {
+            "@scope/missing": "workspace:*"
+          }
+        })
+      }
+    });
+    const report = await runWorkspaceCheck(root);
+    const finding = getPackageFindings(report, "packages/a").find((item) => item.id === "dependencies.workspace-range");
+
+    expect(finding).toMatchObject({
+      severity: "error",
+      suggestion: "Add a matching workspace package or replace the workspace protocol range before publishing."
+    });
+  });
+
+  it("errors when a public package has a runtime dependency on a private workspace package", async () => {
+    const root = await createWorkspaceFixture({
+      rootPackageJson: {
+        packageManager: "pnpm@9.0.0"
+      },
+      packages: {
+        "packages/a": packageJson({
+          name: "@scope/a",
+          dependencies: {
+            "@scope/private": "workspace:*"
+          }
+        }),
+        "packages/private": packageJson({ name: "@scope/private", private: true })
+      }
+    });
+    const report = await runWorkspaceCheck(root);
+    const finding = getPackageFindings(report, "packages/a").find((item) => item.id === "dependencies.workspace-range");
+
+    expect(finding).toMatchObject({
+      severity: "error"
+    });
+    expect(finding?.message).toContain("private workspace package packages/private");
+  });
+
+  it("warns when a public package has only a dev dependency on a private workspace package", async () => {
+    const root = await createWorkspaceFixture({
+      rootPackageJson: {
+        packageManager: "pnpm@9.0.0"
+      },
+      packages: {
+        "packages/a": packageJson({
+          name: "@scope/a",
+          devDependencies: {
+            "@scope/private": "workspace:*"
+          }
+        }),
+        "packages/private": packageJson({ name: "@scope/private", private: true })
+      }
+    });
+    const report = await runWorkspaceCheck(root);
+    const finding = getPackageFindings(report, "packages/a").find((item) => item.id === "dependencies.workspace-range");
+
+    expect(finding).toMatchObject({
+      severity: "warning"
+    });
+  });
+
+  it("errors on workspace ranges when the root package manager is not pnpm", async () => {
+    const root = await createWorkspaceFixture({
+      rootPackageJson: {
+        packageManager: "npm@10.8.2"
+      },
+      packages: {
+        "packages/a": packageJson({
+          name: "@scope/a",
+          dependencies: {
+            "@scope/shared": "workspace:*"
+          }
+        }),
+        "packages/shared": packageJson({ name: "@scope/shared" })
+      }
+    });
+    const report = await runWorkspaceCheck(root);
+    const finding = getPackageFindings(report, "packages/a").find((item) => item.id === "dependencies.workspace-range");
+
+    expect(finding).toMatchObject({
+      severity: "error",
+      suggestion: "Replace workspace protocol ranges before publishing with this package manager."
+    });
+  });
+
+  it("errors on workspace ranges when a pnpm workspace publishes through npm", async () => {
+    const root = await createWorkspaceFixture({
+      rootPackageJson: {
+        packageManager: "pnpm@9.0.0"
+      },
+      packages: {
+        "packages/a": packageJson({
+          name: "@scope/a",
+          dependencies: {
+            "@scope/shared": "workspace:*"
+          }
+        }),
+        "packages/shared": packageJson({ name: "@scope/shared" })
+      },
+      files: {
+        ".github/workflows/release.yml": "name: release\non: workflow_dispatch\njobs:\n  publish:\n    steps:\n      - run: npm publish\n"
+      }
+    });
+    const report = await runWorkspaceCheck(root);
+    const finding = getPackageFindings(report, "packages/a").find((item) => item.id === "dependencies.workspace-range");
+
+    expect(finding).toMatchObject({
+      severity: "error",
+      suggestion: "Use a pnpm publish path that rewrites workspace protocol ranges, or replace the range before npm publishing."
+    });
+  });
+
+  it("builds workspace check context from named workspace package metadata", async () => {
+    const root = await createWorkspaceFixture({
+      rootPackageJson: {
+        packageManager: "pnpm@9.0.0"
+      },
+      packages: {
+        "packages/a": packageJson({ name: "@scope/a" }),
+        "packages/private": packageJson({ name: "private-package", private: true }),
+        "packages/unnamed": packageJson({ name: undefined })
+      },
+      files: {
+        ".github/workflows/release.yml": "name: release\non: workflow_dispatch\njobs: {}\n"
+      }
+    });
+    const discovery = await discoverWorkspaces(root);
+
+    const context = createWorkspaceCheckContext(discovery);
+
+    expect(context?.packageManager.detected).toBe("pnpm");
+    expect(context?.publishPath.kind).toBe("pnpm");
+    expect(context?.rootWorkflows).toHaveLength(1);
+    expect(Array.from(context?.packagesByName.keys() ?? [])).toEqual(["@scope/a", "private-package"]);
+    expect(context?.packagesByName.get("private-package")).toMatchObject({
+      relativePath: "packages/private",
+      private: true
+    });
+  });
 });
+
+function getPackageFindings(
+  report: Awaited<ReturnType<typeof runBatchChecks>>,
+  relativePath: string
+): Awaited<ReturnType<typeof runBatchChecks>>["packages"][number]["report"]["findings"] {
+  return report.packages.find((packageReport) => packageReport.target.relativePath === relativePath)?.report.findings ?? [];
+}
+
+function getPackageFindingIds(report: Awaited<ReturnType<typeof runBatchChecks>>, relativePath: string): string[] {
+  return getPackageFindings(report, relativePath).map((finding) => finding.id);
+}
 
 function packageJson(overrides: Record<string, unknown>): Record<string, unknown> {
   const data: Record<string, unknown> = {
@@ -136,6 +316,7 @@ async function runWorkspaceCheck(
     includePrivate: false,
     includeRoot: false
   });
+  const workspaceContext = createWorkspaceCheckContext(discovery);
 
   return await runBatchChecks({
     command: "check",
@@ -145,24 +326,36 @@ async function runWorkspaceCheck(
     skipped: selection.skipped,
     findings: [...discovery.findings, ...selection.findings],
     ignore: options.ignore ?? [],
-    strict: options.strict ?? false
+    strict: options.strict ?? false,
+    ...(workspaceContext ? { workspaceContext } : {})
   });
 }
 
-async function createWorkspaceFixture(options: { packages: Record<string, Record<string, unknown>> }): Promise<string> {
+async function createWorkspaceFixture(options: {
+  packages: Record<string, Record<string, unknown>>;
+  rootPackageJson?: Record<string, unknown>;
+  files?: Record<string, string>;
+}): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "pkg-guard-batch-"));
 
   await writeJsonFile(join(root, "package.json"), {
     name: "root",
     version: "1.0.0",
     private: true,
-    workspaces: ["packages/*"]
+    workspaces: ["packages/*"],
+    ...options.rootPackageJson
   });
 
   for (const [relativePath, manifest] of Object.entries(options.packages)) {
     await writeJsonFile(join(root, relativePath, "package.json"), manifest);
     await writeFile(join(root, relativePath, "README.md"), "# Fixture\n");
     await writeFile(join(root, relativePath, "LICENSE"), "MIT\n");
+  }
+
+  for (const [relativePath, content] of Object.entries(options.files ?? {})) {
+    const filePath = join(root, relativePath);
+    await mkdir(join(filePath, ".."), { recursive: true });
+    await writeFile(filePath, content);
   }
 
   return root;

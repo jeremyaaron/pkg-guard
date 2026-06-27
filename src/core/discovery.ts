@@ -143,7 +143,7 @@ async function readJsonFile(filePath: string): Promise<{
   };
 }
 
-async function discoverLockfiles(root: string): Promise<LockfileInfo[]> {
+export async function discoverLockfiles(root: string): Promise<LockfileInfo[]> {
   const lockfiles = await Promise.all(
     Object.entries(lockfileManagers).map(async ([filename, manager]) => {
       const filePath = path.join(root, filename);
@@ -154,7 +154,7 @@ async function discoverLockfiles(root: string): Promise<LockfileInfo[]> {
   return lockfiles.filter((lockfile): lockfile is LockfileInfo => lockfile !== null);
 }
 
-function parsePackageManagerField(value: unknown): PackageManagerField | null {
+export function parsePackageManagerField(value: unknown): PackageManagerField | null {
   if (typeof value !== "string" || value.trim() === "") {
     return null;
   }
@@ -177,7 +177,7 @@ function parsePackageManagerField(value: unknown): PackageManagerField | null {
   };
 }
 
-function detectPackageManager(
+export function detectPackageManager(
   packageManagerField: PackageManagerField | null,
   lockfiles: LockfileInfo[]
 ): PackageManagerInfo {
@@ -301,7 +301,7 @@ async function readTsconfig(root: string): Promise<TsconfigInfo | null> {
   return { path: filePath, data, raw };
 }
 
-async function readWorkflows(root: string): Promise<WorkflowInfo[]> {
+export async function readWorkflows(root: string): Promise<WorkflowInfo[]> {
   const workflowRoot = path.join(root, ".github", "workflows");
 
   if (!(await isReadableDirectory(workflowRoot))) {

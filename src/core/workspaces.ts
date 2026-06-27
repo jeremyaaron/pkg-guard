@@ -4,7 +4,8 @@ import path from "node:path";
 
 import { parse } from "yaml";
 
-import type { PackageManifestFile } from "./context.js";
+import type { PackageManagerInfo, PackageManifestFile, WorkflowInfo } from "./context.js";
+import { detectPackageManager, discoverLockfiles, parsePackageManagerField, readWorkflows } from "./discovery.js";
 import type { Finding } from "./findings.js";
 
 export interface WorkspacePattern {
@@ -47,6 +48,8 @@ export interface WorkspaceTargetSelection {
 export interface WorkspaceDiscovery {
   root: string;
   manifest: PackageManifestFile | null;
+  packageManager: PackageManagerInfo | null;
+  rootWorkflows: WorkflowInfo[];
   patterns: WorkspacePattern[];
   packages: WorkspacePackage[];
   findings: Finding[];
@@ -72,12 +75,18 @@ export async function discoverWorkspaces(rootInput: string): Promise<WorkspaceDi
     return {
       root,
       manifest: null,
+      packageManager: null,
+      rootWorkflows: [],
       patterns: [],
       packages: [],
       findings: [workspaceConfigInvalidFinding(manifest.message, "package.json")]
     };
   }
 
+  const lockfiles = await discoverLockfiles(root);
+  const packageManagerField = parsePackageManagerField(manifest.manifest.data.packageManager);
+  const packageManager = detectPackageManager(packageManagerField, lockfiles);
+  const rootWorkflows = await readWorkflows(root);
   const patternResult = await readWorkspacePatterns(root, manifest.manifest);
   findings.push(...patternResult.findings);
 
@@ -106,6 +115,8 @@ export async function discoverWorkspaces(rootInput: string): Promise<WorkspaceDi
   return {
     root,
     manifest: manifest.manifest,
+    packageManager,
+    rootWorkflows,
     patterns: patternResult.patterns,
     packages: [...included.values()].sort((left, right) => left.relativePath.localeCompare(right.relativePath)),
     findings

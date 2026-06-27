@@ -6,7 +6,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { runChecks } from "../src/core/checks.js";
+import type { PackageManagerInfo, WorkflowInfo } from "../src/core/context.js";
 import { discoverProject } from "../src/core/discovery.js";
+import { inferWorkspacePublishPath } from "../src/core/publish-path.js";
 
 const missingValidationFindingIds = [
   "workflow.test-step-missing",
@@ -480,6 +482,60 @@ jobs:
   });
 });
 
+describe("workspace publish path inference", () => {
+  it("infers pnpm when the root manager is pnpm and no npm publish workflow is present", () => {
+    const result = inferWorkspacePublishPath({
+      packageManager: packageManager("pnpm"),
+      rootWorkflows: [workflow("root-ci.yml", "jobs:\n  test:\n    steps:\n      - run: pnpm test\n")],
+      packageWorkflows: []
+    });
+
+    expect(result.kind).toBe("pnpm");
+  });
+
+  it("infers npm when a root workflow runs npm publish", () => {
+    const result = inferWorkspacePublishPath({
+      packageManager: packageManager("pnpm"),
+      rootWorkflows: [workflow("root-release.yml", createPublishWorkflow("pnpm test"))],
+      packageWorkflows: []
+    });
+
+    expect(result.kind).toBe("npm");
+    expect(result.reason).toContain("root-release.yml");
+  });
+
+  it("infers npm when a package-local workflow runs npm publish", () => {
+    const result = inferWorkspacePublishPath({
+      packageManager: packageManager("pnpm"),
+      rootWorkflows: [],
+      packageWorkflows: [workflow("package-release.yml", createPublishWorkflow("pnpm test"))]
+    });
+
+    expect(result.kind).toBe("npm");
+    expect(result.reason).toContain("package-release.yml");
+  });
+
+  it("infers npm when a relevant workflow runs semantic-release through npx", () => {
+    const result = inferWorkspacePublishPath({
+      packageManager: packageManager("pnpm"),
+      rootWorkflows: [workflow("release.yml", createPublishWorkflow("pnpm test", "npx semantic-release"))],
+      packageWorkflows: []
+    });
+
+    expect(result.kind).toBe("npm");
+  });
+
+  it("infers unknown when the root manager is not pnpm", () => {
+    const result = inferWorkspacePublishPath({
+      packageManager: packageManager("npm"),
+      rootWorkflows: [],
+      packageWorkflows: []
+    });
+
+    expect(result.kind).toBe("unknown");
+  });
+});
+
 async function getCheckFindings(root: string) {
   const discovery = await discoverProject(root);
 
@@ -519,6 +575,21 @@ jobs:
       - run: ${validationCommand}
       - run: ${publishCommand}
 `;
+}
+
+function packageManager(detected: PackageManagerInfo["detected"]): PackageManagerInfo {
+  return {
+    detected,
+    packageManagerField: null,
+    lockfiles: []
+  };
+}
+
+function workflow(name: string, raw: string): WorkflowInfo {
+  return {
+    path: join("/workspace/.github/workflows", name),
+    raw
+  };
 }
 
 async function createFixture(options: {

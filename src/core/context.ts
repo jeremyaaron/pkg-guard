@@ -86,6 +86,7 @@ export interface WorkspacePackageContext {
   packageManager: PackageManagerInfo;
   packagesByName: Record<string, WorkspacePackageMetadata>;
   publishPath: WorkspacePublishPath;
+  rootWorkflows: WorkflowInfo[];
 }
 
 export interface WorkspacePackageMetadata {

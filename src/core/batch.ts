@@ -1,16 +1,23 @@
 import { runChecks } from "./checks.js";
-import type { PackageManagerInfo, WorkspacePackageMetadata, WorkspacePublishPath } from "./context.js";
+import type {
+  PackageManagerInfo,
+  ProjectContext,
+  WorkflowInfo,
+  WorkspacePackageMetadata,
+  WorkspacePublishPath
+} from "./context.js";
 import { discoverProject } from "./discovery.js";
 import { applyFixPlans, planFixes, type FixPlan } from "./fixes.js";
 import { createReport, getExitCode, summarizeFindings, type Finding, type FindingSummary, type Report } from "./findings.js";
 import { applyFindingPolicy } from "./policy.js";
-import type { WorkspaceRunTarget } from "./workspaces.js";
+import type { WorkspaceDiscovery, WorkspaceRunTarget } from "./workspaces.js";
 
 export interface WorkspaceCheckContext {
   root: string;
   packageManager: PackageManagerInfo;
   packagesByName: Map<string, WorkspacePackageMetadata>;
   publishPath: WorkspacePublishPath;
+  rootWorkflows: WorkflowInfo[];
 }
 
 export interface BatchCheckOptions {
@@ -109,6 +116,37 @@ export function getBatchExitCode(report: BatchCheckReport): number {
   return getExitCode([...report.findings, ...report.packages.flatMap((packageReport) => packageReport.report.findings)]);
 }
 
+export function createWorkspaceCheckContext(discovery: WorkspaceDiscovery): WorkspaceCheckContext | undefined {
+  if (!discovery.packageManager) {
+    return undefined;
+  }
+
+  const packagesByName = new Map<string, WorkspacePackageMetadata>();
+
+  for (const workspacePackage of discovery.packages) {
+    if (!workspacePackage.name) {
+      continue;
+    }
+
+    packagesByName.set(workspacePackage.name, {
+      name: workspacePackage.name,
+      relativePath: workspacePackage.relativePath,
+      private: workspacePackage.private
+    });
+  }
+
+  return {
+    root: discovery.root,
+    packageManager: discovery.packageManager,
+    packagesByName,
+    publishPath: {
+      kind: "unknown",
+      reason: "Publish path inference has not run yet."
+    },
+    rootWorkflows: discovery.rootWorkflows
+  };
+}
+
 export async function runBatchFixes(options: BatchFixOptions): Promise<BatchFixReport> {
   const packages: PackageFixReport[] = [];
 
@@ -146,8 +184,9 @@ export function getBatchFixExitCode(report: BatchFixReport): number {
 
 async function runPackageChecks(target: WorkspaceRunTarget, options: BatchCheckOptions): Promise<PackageCheckReport> {
   const discovery = await discoverProject(target.root);
-  const findings = discovery.context
-    ? applyFindingPolicy([...discovery.findings, ...runChecks(discovery.context)], discovery.context.config, {
+  const context = discovery.context ? withWorkspaceContext(discovery.context, target, options.workspaceContext) : null;
+  const findings = context
+    ? applyFindingPolicy([...discovery.findings, ...runChecks(context)], context.config, {
         ignore: options.ignore,
         strict: options.strict
       })
@@ -156,6 +195,30 @@ async function runPackageChecks(target: WorkspaceRunTarget, options: BatchCheckO
   return {
     target,
     report: createReport(options.command, target.root, findings)
+  };
+}
+
+function withWorkspaceContext(
+  context: ProjectContext,
+  target: WorkspaceRunTarget,
+  workspaceContext: WorkspaceCheckContext | undefined
+): ProjectContext {
+  if (!workspaceContext) {
+    return context;
+  }
+
+  return {
+    ...context,
+    workspace: {
+      root: workspaceContext.root,
+      packageRoot: target.root,
+      packageRelativePath: target.relativePath,
+      packageName: target.name,
+      packageManager: workspaceContext.packageManager,
+      packagesByName: Object.fromEntries(workspaceContext.packagesByName),
+      publishPath: workspaceContext.publishPath,
+      rootWorkflows: workspaceContext.rootWorkflows
+    }
   };
 }
 

@@ -110,7 +110,16 @@ npm run typecheck
 
 Status:
 
-- Pending.
+- Completed on 2026-06-26.
+- Exported the existing project-discovery helpers needed by workspace discovery: lockfile detection, package-manager parsing/detection, and workflow reading.
+- Extended `WorkspaceDiscovery` with root package-manager information and root workflow metadata.
+- Added `createWorkspaceCheckContext` to build a batch-level context from discovered workspace packages, indexing only named packages.
+- Attached optional per-package `context.workspace` during workspace batch checks, with publish path still set to conservative `unknown`.
+- Updated workspace CLI checks to pass the generated context into batch execution.
+- Added batch coverage for named package indexing, private package metadata, root workflow carry-through, and root package manager carry-through.
+- `npm test -- tests/workspaces.test.ts tests/batch.test.ts tests/cli-run.test.ts` passed: 48 tests across 3 test files.
+- `npm run typecheck` passed.
+- `npm test` passed: 193 tests across 15 test files.
 
 ## Phase 3: Publish Path Inference
 

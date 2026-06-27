@@ -1,4 +1,4 @@
-import { getBatchExitCode, getBatchFixExitCode, runBatchChecks, runBatchFixes } from "../core/batch.js";
+import { createWorkspaceCheckContext, getBatchExitCode, getBatchFixExitCode, runBatchChecks, runBatchFixes } from "../core/batch.js";
 import type { ProjectContext } from "../core/context.js";
 import { discoverProject } from "../core/discovery.js";
 import { runChecks } from "../core/checks.js";
@@ -354,6 +354,7 @@ async function runWorkspaceCommand(options: ParsedOptions, io: CliIO): Promise<n
     return getBatchFixExitCode(report);
   }
 
+  const workspaceContext = createWorkspaceCheckContext(discovery);
   const report = await runBatchChecks({
     command: "check",
     cwd: options.cwd,
@@ -362,7 +363,8 @@ async function runWorkspaceCommand(options: ParsedOptions, io: CliIO): Promise<n
     skipped: selection.skipped,
     findings: discovery.findings,
     ignore: options.ignore,
-    strict: options.strict
+    strict: options.strict,
+    ...(workspaceContext ? { workspaceContext } : {})
   });
 
   io.stdout.write(

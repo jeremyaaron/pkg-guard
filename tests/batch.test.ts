@@ -5,7 +5,7 @@ import { mkdtemp } from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-import { runBatchChecks } from "../src/core/batch.js";
+import { createWorkspaceCheckContext, runBatchChecks } from "../src/core/batch.js";
 import { discoverWorkspaces, selectWorkspaceTargets } from "../src/core/workspaces.js";
 
 describe("runBatchChecks", () => {
@@ -104,6 +104,34 @@ describe("runBatchChecks", () => {
       severity: "warning"
     });
   });
+
+  it("builds workspace check context from named workspace package metadata", async () => {
+    const root = await createWorkspaceFixture({
+      rootPackageJson: {
+        packageManager: "pnpm@9.0.0"
+      },
+      packages: {
+        "packages/a": packageJson({ name: "@scope/a" }),
+        "packages/private": packageJson({ name: "private-package", private: true }),
+        "packages/unnamed": packageJson({ name: undefined })
+      },
+      files: {
+        ".github/workflows/release.yml": "name: release\non: workflow_dispatch\njobs: {}\n"
+      }
+    });
+    const discovery = await discoverWorkspaces(root);
+
+    const context = createWorkspaceCheckContext(discovery);
+
+    expect(context?.packageManager.detected).toBe("pnpm");
+    expect(context?.publishPath.kind).toBe("unknown");
+    expect(context?.rootWorkflows).toHaveLength(1);
+    expect(Array.from(context?.packagesByName.keys() ?? [])).toEqual(["@scope/a", "private-package"]);
+    expect(context?.packagesByName.get("private-package")).toMatchObject({
+      relativePath: "packages/private",
+      private: true
+    });
+  });
 });
 
 function packageJson(overrides: Record<string, unknown>): Record<string, unknown> {
@@ -136,6 +164,7 @@ async function runWorkspaceCheck(
     includePrivate: false,
     includeRoot: false
   });
+  const workspaceContext = createWorkspaceCheckContext(discovery);
 
   return await runBatchChecks({
     command: "check",
@@ -145,24 +174,36 @@ async function runWorkspaceCheck(
     skipped: selection.skipped,
     findings: [...discovery.findings, ...selection.findings],
     ignore: options.ignore ?? [],
-    strict: options.strict ?? false
+    strict: options.strict ?? false,
+    ...(workspaceContext ? { workspaceContext } : {})
   });
 }
 
-async function createWorkspaceFixture(options: { packages: Record<string, Record<string, unknown>> }): Promise<string> {
+async function createWorkspaceFixture(options: {
+  packages: Record<string, Record<string, unknown>>;
+  rootPackageJson?: Record<string, unknown>;
+  files?: Record<string, string>;
+}): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "pkg-guard-batch-"));
 
   await writeJsonFile(join(root, "package.json"), {
     name: "root",
     version: "1.0.0",
     private: true,
-    workspaces: ["packages/*"]
+    workspaces: ["packages/*"],
+    ...options.rootPackageJson
   });
 
   for (const [relativePath, manifest] of Object.entries(options.packages)) {
     await writeJsonFile(join(root, relativePath, "package.json"), manifest);
     await writeFile(join(root, relativePath, "README.md"), "# Fixture\n");
     await writeFile(join(root, relativePath, "LICENSE"), "MIT\n");
+  }
+
+  for (const [relativePath, content] of Object.entries(options.files ?? {})) {
+    const filePath = join(root, relativePath);
+    await mkdir(join(filePath, ".."), { recursive: true });
+    await writeFile(filePath, content);
   }
 
   return root;

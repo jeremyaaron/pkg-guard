@@ -1,0 +1,285 @@
+# pkg-guard v0.3.2 Implementation Plan
+
+## Purpose
+
+This patch refines `dependencies.workspace-range` for pnpm workspaces without weakening publish safety. The work should stay focused on issue #11 and avoid turning into a broader release-orchestration feature.
+
+The implementation should preserve single-package behavior, keep the existing finding ID, and make workspace-mode checks precise enough to avoid blocking valid pnpm local workspace dependencies.
+
+## Phase 0: Baseline
+
+Goal: confirm the current v0.3.1 state before implementation.
+
+Scope:
+
+- Run focused dependency and batch tests.
+- Run typecheck.
+- Confirm issue #11 is still open and mapped to the v0.3.2 PRD/design.
+
+Suggested commands:
+
+```sh
+npm test -- tests/dependencies.test.ts tests/batch.test.ts tests/cli-run.test.ts
+npm run typecheck
+```
+
+Acceptance criteria:
+
+- Existing focused tests pass before production edits.
+- Baseline status is recorded in this file.
+
+Status:
+
+- Completed on 2026-06-26.
+- `npm test -- tests/dependencies.test.ts tests/batch.test.ts tests/cli-run.test.ts` passed: 36 tests across 3 test files.
+- `npm run typecheck` passed.
+- Confirmed issue #11 is open: `dependencies.workspace-range` should account for pnpm workspace publish semantics.
+
+## Phase 1: Workspace Publish Context Model
+
+Goal: create the narrow data model needed by dependency checks.
+
+Scope:
+
+- Add optional workspace context types to `src/core/context.ts`:
+  - `WorkspacePackageContext`
+  - `WorkspacePackageMetadata`
+  - `WorkspacePublishPath`
+- Add a batch-level workspace context type in `src/core/batch.ts` or `src/core/workspaces.ts`.
+- Keep `ProjectContext.workspace` optional.
+- Do not change check behavior yet.
+
+Out of scope:
+
+- Dependency severity changes.
+- Publish-path detection.
+- Reporter schema changes.
+
+Acceptance criteria:
+
+- Existing single-package checks still compile and behave the same.
+- Batch code can carry workspace metadata without applying it yet.
+- Typecheck passes.
+
+Suggested commands:
+
+```sh
+npm run typecheck
+npm test -- tests/batch.test.ts
+```
+
+Status:
+
+- Pending.
+
+## Phase 2: Workspace Context Plumbing
+
+Goal: attach package-specific workspace context during workspace checks.
+
+Scope:
+
+- Build workspace package metadata from `WorkspaceDiscovery.packages`.
+- Index only named workspace packages by package name.
+- Pass root package manager info into batch execution.
+- Attach `context.workspace` after `discoverProject(target.root)` in workspace batch checks.
+- Include root workflows and package workflows as inputs to later publish-path detection, but keep publish path initially conservative.
+
+Out of scope:
+
+- Dependency check changes.
+- Fix-mode workspace context unless needed by shared types.
+
+Acceptance criteria:
+
+- `pkg-guard check --workspaces` still reports existing findings.
+- Workspace package reports can run with optional context attached.
+- Existing workspace and batch tests pass.
+
+Suggested commands:
+
+```sh
+npm test -- tests/workspaces.test.ts tests/batch.test.ts tests/cli-run.test.ts
+npm run typecheck
+```
+
+Status:
+
+- Pending.
+
+## Phase 3: Publish Path Inference
+
+Goal: conservatively classify workspace publish path as `pnpm`, `npm`, or `unknown`.
+
+Scope:
+
+- Add a small publish-path helper, likely in `src/core/batch.ts` or a new `src/core/publish-path.ts`.
+- Infer `pnpm` only when root package manager is pnpm and no relevant npm publish workflow is detected.
+- Infer `npm` when root or package workflows contain direct `npm publish` or `npx semantic-release`.
+- Infer `unknown` for non-pnpm root managers or insufficient confidence.
+- Add focused tests for:
+  - pnpm root with no publish workflow -> `pnpm`
+  - pnpm root with root `npm publish` workflow -> `npm`
+  - pnpm root with package-local `npm publish` workflow -> `npm`
+  - npm root -> `unknown`
+
+Out of scope:
+
+- Parsing package scripts for publish commands.
+- Generating pnpm release workflows.
+- Semantic-release config parsing.
+
+Acceptance criteria:
+
+- Obvious npm publish paths force `npm`.
+- pnpm-safe path is inferred only in the absence of obvious npm publish workflows.
+- Typecheck passes.
+
+Suggested commands:
+
+```sh
+npm test -- tests/batch.test.ts tests/workflows.test.ts
+npm run typecheck
+```
+
+Status:
+
+- Pending.
+
+## Phase 4: Workspace-Range Decision Logic
+
+Goal: refine `dependencies.workspace-range` using workspace context.
+
+Scope:
+
+- Change `checkWorkspaceRanges` to receive `ProjectContext`.
+- Preserve existing error behavior when no workspace context exists.
+- Preserve error behavior for non-pnpm or unknown publish paths.
+- Suppress the finding when:
+  - root manager is pnpm,
+  - publish path is `pnpm`,
+  - the dependency name resolves to a local workspace package,
+  - the target package is not private.
+- Emit `dependencies.workspace-range` error when the workspace target is missing.
+- Emit `dependencies.workspace-range` error when public package runtime/peer/optional metadata depends on a private workspace package.
+- Emit `dependencies.workspace-range` warning when only `devDependencies` points to a private workspace target under otherwise pnpm-safe context.
+- Improve messages and suggestions based on reason.
+
+Out of scope:
+
+- New check IDs.
+- JSON schema changes.
+- Full pnpm manifest rewrite simulation.
+
+Acceptance criteria:
+
+- Single-package `workspace:*` remains an error.
+- Valid pnpm workspace dependency on a publishable local package emits no finding.
+- Missing workspace target emits an error.
+- Private runtime target emits an error.
+- Private dev-only target emits a warning.
+- npm publish path emits an error even in pnpm workspaces.
+
+Suggested commands:
+
+```sh
+npm test -- tests/dependencies.test.ts tests/batch.test.ts tests/cli-run.test.ts
+npm run typecheck
+```
+
+Status:
+
+- Pending.
+
+## Phase 5: CLI and Reporter Smoke Coverage
+
+Goal: verify the refined behavior through user-facing workspace commands.
+
+Scope:
+
+- Add or update CLI tests for `pkg-guard check --workspaces` in pnpm fixtures.
+- Cover human output enough to verify release-blocking errors disappear for pnpm-safe cases.
+- Cover JSON output enough to verify findings remain package-scoped.
+- Confirm SARIF output requires no schema changes.
+
+Out of scope:
+
+- Snapshot-heavy reporter rewrites.
+- New reporter fields.
+
+Acceptance criteria:
+
+- CLI workspace behavior matches dependency/batch behavior.
+- JSON and SARIF still render valid reports.
+
+Suggested commands:
+
+```sh
+npm test -- tests/cli-run.test.ts tests/reporters.test.ts
+npm run typecheck
+```
+
+Status:
+
+- Pending.
+
+## Phase 6: Documentation and Changelog
+
+Goal: document the pnpm nuance and the npm-publish caveat.
+
+Scope:
+
+- Add a `0.3.2` changelog entry.
+- Update `docs/checks.md` for refined `dependencies.workspace-range` behavior.
+- Update `docs/examples.md` with a short pnpm workspace example.
+- Update `docs/release-workflow.md` only if needed to clarify that generated workflows publish with npm.
+
+Acceptance criteria:
+
+- Docs explain why pnpm workspace dependencies can be safe.
+- Docs explain why npm publish workflows still make `workspace:` ranges unsafe.
+- Changelog maps directly to issue #11.
+
+Suggested commands:
+
+```sh
+npm run lint
+```
+
+Status:
+
+- Pending.
+
+## Phase 7: Final Verification and Release Prep
+
+Goal: prepare v0.3.2 for release.
+
+Scope:
+
+- Run focused tests.
+- Run full verification.
+- Verify pack output.
+- Bump `package.json` and `package-lock.json` from `0.3.1` to `0.3.2`.
+- Re-run full verification after the version bump.
+
+Suggested commands:
+
+```sh
+npm test -- tests/dependencies.test.ts tests/batch.test.ts tests/cli-run.test.ts
+npm test
+npm run typecheck
+npm run lint
+npm run build
+node dist/cli/index.js check
+npm pack --dry-run --json --ignore-scripts
+```
+
+Acceptance criteria:
+
+- Full verification passes after version bump.
+- Packed output is clean.
+- `CHANGELOG.md` includes `0.3.2`.
+- The final diff maps to the v0.3.2 PRD, technical design, and implementation plan.
+
+Status:
+
+- Pending.

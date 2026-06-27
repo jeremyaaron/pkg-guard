@@ -139,7 +139,16 @@ npm run typecheck
 
 Status:
 
-- Pending.
+- Completed on 2026-06-27.
+- Added `src/core/package-targets.ts` with shared package target collection for top-level targets, bin targets, export strings, simple export patterns, and nested conditional export targets.
+- Preserved `pack.unsupported-target` for unsupported target shapes.
+- Added `conditions` metadata for export target traversal while keeping export subpath keys out of the condition list.
+- Updated `src/checks/pack.ts` to consume the shared target collector.
+- Preserved existing `pack.entrypoint-missing` behavior and finding IDs.
+- Added `tests/package-targets.test.ts` coverage for top-level targets, bin targets, nested export condition metadata, root conditional exports, unsupported shapes, and simple target pattern detection.
+- `npm test -- tests/package-targets.test.ts tests/pack.test.ts tests/entrypoints.test.ts` passed: 24 tests across 3 test files.
+- `npm run typecheck` passed.
+- `npm test` passed: 218 tests across 16 test files.
 
 ## Phase 3: Analysis Boundary
 

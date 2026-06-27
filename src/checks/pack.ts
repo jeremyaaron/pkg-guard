@@ -1,22 +1,9 @@
 import path from "node:path";
 
 import type { Check } from "../core/checks.js";
-import type { PackageManifest, ProjectContext } from "../core/context.js";
+import type { ProjectContext } from "../core/context.js";
 import type { Finding } from "../core/findings.js";
-
-type DeclaredTarget =
-  | {
-      kind: "file";
-      source: "main" | "module" | "types" | "exports" | "bin";
-      target: string;
-      jsonPath: string;
-    }
-  | {
-      kind: "pattern";
-      source: "exports";
-      targetPattern: string;
-      jsonPath: string;
-    };
+import { collectPackageTargets, isSimpleTargetPattern, type PackageTarget } from "../core/package-targets.js";
 
 export const packChecks: Check[] = [
   {
@@ -91,10 +78,10 @@ function checkRequiredFiles(context: ProjectContext, files: Set<string>): Findin
 }
 
 function checkDeclaredTargetsPacked(context: ProjectContext, files: Set<string>): Finding[] {
-  const findings: Finding[] = [];
-  const targets = collectDeclaredTargets(context.manifest.data, findings);
+  const targetCollection = collectPackageTargets(context.manifest.data);
+  const findings: Finding[] = [...targetCollection.findings];
 
-  for (const target of targets) {
+  for (const target of targetCollection.targets) {
     if (target.kind === "pattern") {
       findings.push(...checkDeclaredPatternPacked(target, files));
       continue;
@@ -122,7 +109,7 @@ function checkDeclaredTargetsPacked(context: ProjectContext, files: Set<string>)
   return findings;
 }
 
-function checkDeclaredPatternPacked(target: Extract<DeclaredTarget, { kind: "pattern" }>, files: Set<string>): Finding[] {
+function checkDeclaredPatternPacked(target: Extract<PackageTarget, { kind: "pattern" }>, files: Set<string>): Finding[] {
   const normalizedPattern = normalizeManifestPattern(target.targetPattern);
 
   if (!normalizedPattern) {
@@ -146,94 +133,6 @@ function checkDeclaredPatternPacked(target: Extract<DeclaredTarget, { kind: "pat
   ];
 }
 
-function collectDeclaredTargets(manifest: PackageManifest, findings: Finding[]): DeclaredTarget[] {
-  const targets: DeclaredTarget[] = [];
-
-  collectTopLevelTarget(targets, findings, "main", manifest.main);
-  collectTopLevelTarget(targets, findings, "module", manifest.module);
-  collectTopLevelTarget(targets, findings, "types", manifest.types);
-  collectTopLevelTarget(targets, findings, "types", manifest.typings, "$.typings");
-  collectBinTargets(targets, findings, manifest.bin);
-  collectExportTargets(targets, findings, manifest.exports);
-
-  return targets;
-}
-
-function collectTopLevelTarget(
-  targets: DeclaredTarget[],
-  findings: Finding[],
-  source: "main" | "module" | "types",
-  value: unknown,
-  jsonPath = `$.${source}`
-): void {
-  if (value === undefined) {
-    return;
-  }
-
-  if (typeof value === "string") {
-    targets.push({ kind: "file", source, target: value, jsonPath });
-    return;
-  }
-
-  findings.push(unsupportedTargetFinding(jsonPath));
-}
-
-function collectBinTargets(targets: DeclaredTarget[], findings: Finding[], value: unknown): void {
-  if (value === undefined) {
-    return;
-  }
-
-  if (typeof value === "string") {
-    targets.push({ kind: "file", source: "bin", target: value, jsonPath: "$.bin" });
-    return;
-  }
-
-  if (isRecord(value)) {
-    for (const [name, target] of Object.entries(value)) {
-      if (typeof target === "string") {
-        targets.push({ kind: "file", source: "bin", target, jsonPath: `$.bin.${formatJsonPathKey(name)}` });
-      } else {
-        findings.push(unsupportedTargetFinding(`$.bin.${formatJsonPathKey(name)}`));
-      }
-    }
-    return;
-  }
-
-  findings.push(unsupportedTargetFinding("$.bin"));
-}
-
-function collectExportTargets(targets: DeclaredTarget[], findings: Finding[], value: unknown): void {
-  if (value === undefined) {
-    return;
-  }
-
-  collectExportValue(targets, findings, value, "$.exports");
-}
-
-function collectExportValue(targets: DeclaredTarget[], findings: Finding[], value: unknown, jsonPath: string): void {
-  if (typeof value === "string") {
-    if (value.includes("*")) {
-      if (isSimplePattern(value)) {
-        targets.push({ kind: "pattern", source: "exports", targetPattern: value, jsonPath });
-      } else {
-        findings.push(unsupportedTargetFinding(jsonPath));
-      }
-    } else {
-      targets.push({ kind: "file", source: "exports", target: value, jsonPath });
-    }
-    return;
-  }
-
-  if (isRecord(value)) {
-    for (const [key, nestedValue] of Object.entries(value)) {
-      collectExportValue(targets, findings, nestedValue, `${jsonPath}.${formatJsonPathKey(key)}`);
-    }
-    return;
-  }
-
-  findings.push(unsupportedTargetFinding(jsonPath));
-}
-
 function normalizeManifestTarget(target: string): string | null {
   if (target.trim() === "" || path.isAbsolute(target)) {
     return null;
@@ -249,7 +148,7 @@ function normalizeManifestTarget(target: string): string | null {
 }
 
 function normalizeManifestPattern(target: string): string | null {
-  if (!isSimplePattern(target) || target.trim() === "" || path.isAbsolute(target)) {
+  if (!isSimpleTargetPattern(target) || target.trim() === "" || path.isAbsolute(target)) {
     return null;
   }
 
@@ -264,10 +163,6 @@ function normalizeManifestPattern(target: string): string | null {
 
 function normalizePackPath(value: string): string {
   return value.replaceAll("\\", "/").replace(/^\.\//, "");
-}
-
-function isSimplePattern(value: string): boolean {
-  return value.split("*").length === 2;
 }
 
 function matchesPackPattern(files: Set<string>, normalizedPattern: string): boolean {
@@ -310,23 +205,4 @@ function hasReadme(files: Set<string>): boolean {
 
 function hasLicenseFile(files: Set<string>): boolean {
   return [...files].some((file) => /^(?:licen[cs]e|copying)(?:\..+)?$/i.test(path.posix.basename(file)));
-}
-
-function unsupportedTargetFinding(jsonPath: string): Finding {
-  return {
-    id: "pack.unsupported-target",
-    severity: "warning",
-    title: "Pack target shape is not supported",
-    message: "This entrypoint shape could not be checked against npm pack output.",
-    file: "package.json",
-    path: jsonPath
-  };
-}
-
-function formatJsonPathKey(key: string): string {
-  return /^[A-Za-z_$][\w$]*$/.test(key) ? key : JSON.stringify(key);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }

@@ -439,7 +439,14 @@ npm run lint
 
 Status:
 
-- Pending.
+- Completed on 2026-06-27.
+- Added a `0.4.0` changelog entry covering consumer smoke, artifact contract validation, shared target collection, analysis-boundary cleanup, workspace reporter coverage, and future IDE-readiness.
+- Updated `docs/checks.md` to clarify `pack.entrypoint-missing` as an npm tarball artifact-contract finding distinct from source-tree entrypoint checks.
+- Documented all `consumer.*` finding IDs, including pack, install, require/import resolution, bin layout, and TypeScript declaration resolution failures.
+- Documented that consumer smoke uses npm tarball creation and isolated npm install with lifecycle scripts disabled.
+- Updated `docs/examples.md` with single-package and workspace `--consumer-smoke` examples, opt-in guidance, workspace install limitations, package contract layers, and the analysis-boundary path toward future IDE integrations.
+- Did not update `docs/configuration.md` because v0.4.0 introduced no new config or preset behavior.
+- `npm run lint` passed.
 
 ## Phase 9: Final Verification and Release Prep
 

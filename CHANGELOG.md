@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0
+
+- Adds opt-in consumer smoke checks with `pkg-guard check --consumer-smoke` for single packages and workspace packages.
+- Consumer smoke creates an npm tarball with `npm pack --json --ignore-scripts --pack-destination`, installs it into an isolated temporary consumer project with lifecycle scripts disabled, and cleans up temporary files.
+- Adds consumer smoke findings for tarball creation, install, runtime resolution, installed bin layout, and TypeScript declaration resolution failures.
+- Expands artifact contract validation by sharing package target collection across pack checks and consumer smoke, including nested conditional exports and simple export pattern metadata.
+- Keeps export pattern runtime smoke conservative by skipping representative subpath generation while existing packlist checks continue to validate whether simple patterns include matching files.
+- Adds an internal analysis boundary for structured findings, separating CLI/report rendering from project analysis and creating a cleaner path toward future IDE integrations.
+- Adds workspace/reporting coverage so consumer smoke findings stay package-scoped in workspace JSON and SARIF output without schema changes.
+
 ## 0.3.2
 
 - Refines `dependencies.workspace-range` for issue #11 so pnpm workspace dependencies on publishable local workspace packages no longer fail when `pkg-guard check --workspaces` can prove pnpm will rewrite them during publish.

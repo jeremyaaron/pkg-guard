@@ -51,6 +51,16 @@ For downstream projects that install `pkg-guard` from npm:
 - run: npx pkg-guard check
 ```
 
+Add opt-in consumer smoke checks when CI can afford a slower tarball install check:
+
+```yaml
+- run: npm ci
+- run: npm run build --if-present
+- run: npx pkg-guard check --consumer-smoke
+```
+
+Consumer smoke packs the package with npm, installs that tarball into a temporary consumer project, and checks installed package resolution without running lifecycle scripts, importing package modules, or executing CLI bins. It is opt-in because it runs package-manager commands and can fail for publish scenarios that require registry-available dependencies.
+
 ## Workspace CI
 
 Run every publishable workspace package from the repository root:
@@ -92,6 +102,14 @@ npx pkg-guard check --workspace @scope/pkg
 npx pkg-guard check --workspace packages/pkg
 ```
 
+Run consumer smoke across selected workspace packages:
+
+```sh
+npx pkg-guard check --workspaces --consumer-smoke
+```
+
+Workspace consumer smoke installs each selected package's generated tarball in isolation. It does not install or publish the entire workspace. A workspace package that depends on unpublished local packages may report `consumer.install-failed` until those dependencies are represented by registry-publishable versions or the package is checked without consumer smoke.
+
 ## pnpm Workspace Dependencies
 
 pnpm rewrites `workspace:` dependency ranges during `pnpm pack` and `pnpm publish` when the range points to a local workspace package. Use workspace mode from the root so `pkg-guard` can inspect the workspace graph before deciding whether `dependencies.workspace-range` is publish-safe:
@@ -124,6 +142,16 @@ For a workspace:
 ```
 
 The SARIF report uses package-relative paths for single-package checks and prefixes workspace package findings with the package path.
+
+## Package Contract Layers
+
+`pkg-guard check` looks at publishing hygiene in layers:
+
+- Source-tree contract: manifest metadata, declared entrypoints, TypeScript config, lifecycle scripts, dependency metadata, and workflows.
+- Artifact contract: npm pack output, including whether declared targets and expected docs are present in the tarball.
+- Consumer contract: optional `--consumer-smoke` checks that install the generated tarball and verify installed runtime, bin, and type resolution without executing package code.
+
+These layers are intentionally package-manager-light. The default check stays fast and read-only; consumer smoke is slower and opt-in. Internally, analysis now returns structured findings separately from CLI rendering, which is the foundation for future IDE integrations that can surface the same findings before release pipelines run.
 
 ## Suppress a Conservative Warning
 

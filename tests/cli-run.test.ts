@@ -373,6 +373,89 @@ describe("runCli", () => {
     });
   });
 
+  it("keeps consumer smoke findings inside workspace package JSON reports", async () => {
+    const fixture = await createPackageFixture({
+      workspaces: ["packages/*"]
+    });
+    await createWorkspacePackage(fixture, "a", {
+      name: "a",
+      version: "1.0.0",
+      license: "MIT",
+      packageManager: "npm@10.8.2",
+      main: "./dist/index.js",
+      files: ["README.md", "LICENSE"]
+    });
+    const result = await invoke(["check", "--workspaces", "--consumer-smoke", "--format", "json"], fixture);
+    const report = JSON.parse(result.stdout) as {
+      schemaVersion: number;
+      summary: { packages: number; skipped: number; errors: number; warnings: number; info: number };
+      findings: unknown[];
+      packages: Array<{
+        relativePath: string;
+        report: {
+          findings: Array<{ id: string; severity: string; file?: string; path?: string }>;
+        };
+      }>;
+    };
+    const packageA = report.packages.find((packageReport) => packageReport.relativePath === "packages/a");
+    const finding = packageA?.report.findings.find((item) => item.id === "consumer.require-unresolved");
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toBe("");
+    expect(report.schemaVersion).toBe(1);
+    expect(report.summary.packages).toBe(1);
+    expect(report.findings).toEqual([]);
+    expect(finding).toMatchObject({
+      severity: "error",
+      file: "package.json",
+      path: "$.main"
+    });
+  });
+
+  it("continues workspace consumer smoke after one package install failure", async () => {
+    const fixture = await createPackageFixture({
+      workspaces: ["packages/*"]
+    });
+    await createWorkspacePackage(fixture, "a", {
+      name: "a",
+      version: "1.0.0",
+      license: "MIT",
+      packageManager: "npm@10.8.2",
+      main: "./dist/index.js",
+      files: ["dist"],
+      dependencies: {
+        "bad dep": "1.0.0"
+      }
+    });
+    await createWorkspacePackage(fixture, "b", {
+      name: "b",
+      version: "1.0.0",
+      license: "MIT",
+      packageManager: "npm@10.8.2",
+      main: "./dist/index.js",
+      files: ["dist"]
+    });
+    const result = await invoke(["check", "--workspaces", "--consumer-smoke", "--format", "json"], fixture);
+    const report = JSON.parse(result.stdout) as {
+      summary: { packages: number; errors: number };
+      packages: Array<{
+        relativePath: string;
+        report: {
+          findings: Array<{ id: string }>;
+        };
+      }>;
+    };
+    const packageA = report.packages.find((packageReport) => packageReport.relativePath === "packages/a");
+    const packageB = report.packages.find((packageReport) => packageReport.relativePath === "packages/b");
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toBe("");
+    expect(report.summary.packages).toBe(2);
+    expect(report.summary.errors).toBe(1);
+    expect(packageA?.report.findings.map((finding) => finding.id)).toContain("consumer.install-failed");
+    expect(packageB?.report.findings).toEqual([]);
+  });
+
   it("prints workspace SARIF output", async () => {
     const fixture = await createPackageFixture({
       workspaces: ["packages/*"]
@@ -407,6 +490,52 @@ describe("runCli", () => {
           }
         }
       ]
+    });
+  });
+
+  it("prints workspace consumer smoke findings in SARIF with package-relative locations", async () => {
+    const fixture = await createPackageFixture({
+      workspaces: ["packages/*"]
+    });
+    await createWorkspacePackage(fixture, "a", {
+      name: "a",
+      version: "1.0.0",
+      license: "MIT",
+      packageManager: "npm@10.8.2",
+      main: "./dist/index.js",
+      files: ["README.md", "LICENSE"]
+    });
+    const result = await invoke(["check", "--workspaces", "--consumer-smoke", "--format", "sarif"], fixture);
+    const report = JSON.parse(result.stdout) as {
+      version: string;
+      runs: Array<{
+        tool: { driver: { rules: Array<{ id: string }> } };
+        results: Array<{
+          ruleId: string;
+          locations?: Array<{ physicalLocation: { artifactLocation: { uri: string } } }>;
+          properties?: { jsonPath?: string };
+        }>;
+      }>;
+    };
+    const resultFinding = report.runs[0]?.results.find((item) => item.ruleId === "consumer.require-unresolved");
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toBe("");
+    expect(report.version).toBe("2.1.0");
+    expect(report.runs[0]?.tool.driver.rules.map((rule) => rule.id)).toContain("consumer.require-unresolved");
+    expect(resultFinding).toMatchObject({
+      locations: [
+        {
+          physicalLocation: {
+            artifactLocation: {
+              uri: "packages/a/package.json"
+            }
+          }
+        }
+      ],
+      properties: {
+        jsonPath: "$.main"
+      }
     });
   });
 
@@ -523,6 +652,16 @@ async function createPackageFixture(overrides: Record<string, unknown> = {}): Pr
   await writeFile(join(root, "LICENSE"), "MIT\n");
 
   return root;
+}
+
+async function createWorkspacePackage(root: string, relativeName: string, packageJson: Record<string, unknown>): Promise<void> {
+  const packageRoot = join(root, "packages", relativeName);
+
+  await writePackageJson(join(packageRoot, "package.json"), packageJson);
+  await mkdir(join(packageRoot, "dist"), { recursive: true });
+  await writeFile(join(packageRoot, "dist", "index.js"), "export {};\n");
+  await writeFile(join(packageRoot, "README.md"), `# ${relativeName}\n`);
+  await writeFile(join(packageRoot, "LICENSE"), "MIT\n");
 }
 
 async function createPnpmWorkspaceRangeFixture(

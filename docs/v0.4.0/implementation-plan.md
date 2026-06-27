@@ -398,7 +398,16 @@ npm run typecheck
 
 Status:
 
-- Pending.
+- Completed on 2026-06-27.
+- Added workspace CLI coverage for `check --workspaces --consumer-smoke` through human, JSON, and SARIF reporter paths.
+- Confirmed consumer smoke findings remain package-scoped in workspace JSON output while top-level workspace findings remain separate.
+- Confirmed SARIF renders consumer smoke findings with package-relative artifact URIs such as `packages/a/package.json` and preserves existing `properties.jsonPath`.
+- Added coverage proving workspace smoke continues to later selected packages after one package reports `consumer.install-failed`.
+- Kept reporter schemas unchanged and reused existing batch JSON/SARIF structures.
+- `npm test -- tests/cli-run.test.ts tests/batch.test.ts tests/reporters.test.ts` passed: 55 tests across 3 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm test` passed: 240 tests across 18 test files.
 
 ## Phase 8: Documentation and Changelog
 

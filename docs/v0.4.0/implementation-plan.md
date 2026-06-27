@@ -481,4 +481,21 @@ Acceptance criteria:
 
 Status:
 
-- Pending.
+- Completed on 2026-06-27.
+- Pre-bump verification passed on `0.3.2`:
+  - `npm test -- tests/pack.test.ts tests/consumer-smoke.test.ts tests/cli-run.test.ts tests/batch.test.ts` passed: 69 tests across 4 test files.
+  - `npm test` passed: 240 tests across 18 test files.
+  - `npm run typecheck` passed.
+  - `npm run lint` passed.
+  - `npm run build` passed.
+  - `node dist/cli/index.js check` passed with no findings.
+  - `npm pack --dry-run --json --ignore-scripts` passed for `pkg-guard@0.3.2` with 150 entries.
+- Bumped `package.json` and `package-lock.json` from `0.3.2` to `0.4.0` using `npm version 0.4.0 --no-git-tag-version`.
+- Post-bump verification passed on `0.4.0`:
+  - `npm test -- tests/pack.test.ts tests/consumer-smoke.test.ts tests/cli-run.test.ts tests/batch.test.ts` passed: 69 tests across 4 test files.
+  - `npm test` passed: 240 tests across 18 test files.
+  - `npm run typecheck` passed.
+  - `npm run lint` passed.
+  - `npm run build` passed.
+  - `node dist/cli/index.js check` passed with no findings.
+  - `npm pack --dry-run --json --ignore-scripts` passed for `pkg-guard@0.4.0` with 150 entries, package size 150470 bytes, unpacked size 675726 bytes, and no bundled dependencies.

@@ -352,7 +352,18 @@ npm run typecheck
 
 Status:
 
-- Pending.
+- Completed on 2026-06-27.
+- Added installed-package bin smoke checks after tarball install.
+- Read installed package metadata from `node_modules`, verified declared bin targets exist in the installed package layout, and verified installed bin files start with a shebang without executing them.
+- Added `consumer.bin-unresolved` findings with `file: "package.json"` and the relevant `$.bin` JSON path.
+- Added best-effort TypeScript declaration smoke using pkg-guard's locally resolvable `typescript/bin/tsc`; no `npx` or network access is used.
+- Type smoke creates a temporary consumer `index.ts`, runs TypeScript with `--noEmit`, `moduleResolution nodenext`, `module nodenext`, `target es2022`, and `--strict`, and silently skips when TypeScript is not locally available.
+- Added `consumer.types-unresolved` findings for declaration resolution failures with `file: "package.json"` and the relevant type metadata JSON path.
+- Added consumer smoke coverage for missing installed bin targets, installed bin targets without shebangs, valid installed bins, missing declarations, and valid declarations.
+- `npm test -- tests/consumer-smoke.test.ts tests/typescript.test.ts tests/entrypoints.test.ts` passed: 42 tests across 3 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm test` passed: 237 tests across 18 test files.
 
 ## Phase 7: Workspace and Reporter Smoke Coverage
 

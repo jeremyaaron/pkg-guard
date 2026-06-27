@@ -182,6 +182,123 @@ describe("runConsumerSmokeChecks", () => {
 
     expect(findings).toEqual([]);
   });
+
+  it("reports installed bin targets that are missing", async () => {
+    const root = await createPackageFixture({
+      name: "consumer-smoke-bin-missing",
+      version: "1.0.0",
+      main: "./dist/index.js",
+      bin: {
+        smoke: "./dist/cli.js"
+      },
+      files: ["dist/index.js"]
+    });
+    const context = await discoverContext(root);
+
+    const findings = await runConsumerSmokeChecks(context);
+
+    expect(findings).toEqual([
+      expect.objectContaining({
+        id: "consumer.bin-unresolved",
+        severity: "error",
+        file: "package.json",
+        path: "$.bin.smoke"
+      })
+    ]);
+  });
+
+  it("reports installed bin targets without shebangs", async () => {
+    const root = await createPackageFixture(
+      {
+        name: "consumer-smoke-bin-no-shebang",
+        version: "1.0.0",
+        main: "./dist/index.js",
+        bin: {
+          smoke: "./dist/cli.js"
+        },
+        files: ["dist"]
+      },
+      {
+        "dist/cli.js": "console.log('smoke');\n"
+      }
+    );
+    const context = await discoverContext(root);
+
+    const findings = await runConsumerSmokeChecks(context);
+
+    expect(findings).toEqual([
+      expect.objectContaining({
+        id: "consumer.bin-unresolved",
+        severity: "error",
+        file: "package.json",
+        path: "$.bin.smoke"
+      })
+    ]);
+  });
+
+  it("passes installed bin targets with shebangs", async () => {
+    const root = await createPackageFixture(
+      {
+        name: "consumer-smoke-bin-valid",
+        version: "1.0.0",
+        main: "./dist/index.js",
+        bin: {
+          smoke: "./dist/cli.js"
+        },
+        files: ["dist"]
+      },
+      {
+        "dist/cli.js": "#!/usr/bin/env node\nconsole.log('smoke');\n"
+      }
+    );
+    const context = await discoverContext(root);
+
+    const findings = await runConsumerSmokeChecks(context);
+
+    expect(findings).toEqual([]);
+  });
+
+  it("reports unresolved TypeScript declarations when local TypeScript is available", async () => {
+    const root = await createPackageFixture({
+      name: "consumer-smoke-types-missing",
+      version: "1.0.0",
+      main: "./dist/index.js",
+      types: "./dist/missing.d.ts",
+      files: ["dist"]
+    });
+    const context = await discoverContext(root);
+
+    const findings = await runConsumerSmokeChecks(context);
+
+    expect(findings).toEqual([
+      expect.objectContaining({
+        id: "consumer.types-unresolved",
+        severity: "error",
+        file: "package.json",
+        path: "$.types"
+      })
+    ]);
+  });
+
+  it("passes resolvable TypeScript declarations", async () => {
+    const root = await createPackageFixture(
+      {
+        name: "consumer-smoke-types-valid",
+        version: "1.0.0",
+        main: "./dist/index.js",
+        types: "./dist/index.d.ts",
+        files: ["dist"]
+      },
+      {
+        "dist/index.d.ts": "export interface Smoke { ok: true }\n"
+      }
+    );
+    const context = await discoverContext(root);
+
+    const findings = await runConsumerSmokeChecks(context);
+
+    expect(findings).toEqual([]);
+  });
 });
 
 async function discoverContext(root: string) {

@@ -1,14 +1,16 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import type { ProjectContext } from "./context.js";
+import type { PackageManifest, ProjectContext } from "./context.js";
 import type { Finding } from "./findings.js";
 import { collectPackageTargets, type PackageTarget } from "./package-targets.js";
 
 const execFileAsync = promisify(execFile);
+const require = createRequire(import.meta.url);
 
 export const defaultConsumerSmokeTimeoutMs = 30_000;
 
@@ -41,7 +43,11 @@ export async function runConsumerSmokeChecks(context: ProjectContext, options: C
       return [installFailedFinding(installResult.message)];
     }
 
-    return await runRuntimeResolutionProbes(context, consumerRoot, timeoutMs);
+    return [
+      ...(await runRuntimeResolutionProbes(context, consumerRoot, timeoutMs)),
+      ...(await runBinSmokeChecks(context, consumerRoot)),
+      ...(await runTypeResolutionProbe(context, consumerRoot, timeoutMs))
+    ];
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }
@@ -118,6 +124,87 @@ async function runRuntimeResolutionProbes(context: ProjectContext, consumerRoot:
   return findings;
 }
 
+async function runBinSmokeChecks(context: ProjectContext, consumerRoot: string): Promise<Finding[]> {
+  const packageName = getPackageName(context);
+
+  if (!packageName) {
+    return [];
+  }
+
+  const installedManifest = await readInstalledManifest(consumerRoot, packageName);
+
+  if (!installedManifest) {
+    return [];
+  }
+
+  const packageRoot = getInstalledPackageRoot(consumerRoot, packageName);
+  const findings: Finding[] = [];
+
+  for (const entry of getBinEntries(installedManifest)) {
+    const binPath = path.join(packageRoot, entry.target);
+    const content = await readFile(binPath, "utf8").catch(() => null);
+
+    if (content === null) {
+      findings.push(binUnresolvedFinding(entry, `${entry.command} points to ${entry.target}, but that file is not installed.`));
+      continue;
+    }
+
+    if (!content.startsWith("#!")) {
+      findings.push(binUnresolvedFinding(entry, `${entry.command} points to ${entry.target}, but the installed file has no shebang.`));
+    }
+  }
+
+  return findings;
+}
+
+async function runTypeResolutionProbe(context: ProjectContext, consumerRoot: string, timeoutMs: number): Promise<Finding[]> {
+  const packageName = getPackageName(context);
+  const typePath = getTypeProbeJsonPath(context.manifest.data);
+
+  if (!packageName || !typePath) {
+    return [];
+  }
+
+  const tscPath = resolveTypeScriptCompiler();
+
+  if (!tscPath) {
+    return [];
+  }
+
+  await writeFile(
+    path.join(consumerRoot, "index.ts"),
+    `import type * as pkg from ${JSON.stringify(packageName)};\ntype PackageNamespace = typeof pkg;\nexport type { PackageNamespace };\n`
+  );
+
+  try {
+    await execFileAsync(
+      process.execPath,
+      [
+        tscPath,
+        "--noEmit",
+        "--moduleResolution",
+        "nodenext",
+        "--module",
+        "nodenext",
+        "--target",
+        "es2022",
+        "--strict",
+        "--skipLibCheck",
+        "index.ts"
+      ],
+      {
+        cwd: consumerRoot,
+        timeout: timeoutMs,
+        maxBuffer: 1024 * 1024
+      }
+    );
+
+    return [];
+  } catch (error) {
+    return [typesUnresolvedFinding(typePath, commandFailureMessage(error))];
+  }
+}
+
 interface RuntimeResolutionProbe {
   kind: "import" | "require";
   specifier: string;
@@ -162,6 +249,82 @@ function getRuntimeResolutionProbes(context: ProjectContext): RuntimeResolutionP
   }
 
   return probes;
+}
+
+interface BinEntry {
+  command: string;
+  target: string;
+  jsonPath: string;
+}
+
+function getBinEntries(manifest: PackageManifest): BinEntry[] {
+  if (typeof manifest.bin === "string") {
+    return [{ command: getBinCommandFromName(manifest.name), target: manifest.bin, jsonPath: "$.bin" }];
+  }
+
+  if (!isRecord(manifest.bin)) {
+    return [];
+  }
+
+  return Object.entries(manifest.bin)
+    .filter((entry): entry is [string, string] => typeof entry[1] === "string")
+    .map(([command, target]) => ({
+      command,
+      target,
+      jsonPath: `$.bin.${formatJsonPathKey(command)}`
+    }));
+}
+
+function getBinCommandFromName(value: unknown): string {
+  if (typeof value !== "string" || value.trim() === "") {
+    return "<package>";
+  }
+
+  return value.split("/").at(-1) ?? value;
+}
+
+async function readInstalledManifest(consumerRoot: string, packageName: string): Promise<PackageManifest | null> {
+  const manifestPath = path.join(getInstalledPackageRoot(consumerRoot, packageName), "package.json");
+  const raw = await readFile(manifestPath, "utf8").catch(() => null);
+
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function getInstalledPackageRoot(consumerRoot: string, packageName: string): string {
+  return path.join(consumerRoot, "node_modules", ...packageName.split("/"));
+}
+
+function getTypeProbeJsonPath(manifest: PackageManifest): string | null {
+  if (typeof manifest.types === "string") {
+    return "$.types";
+  }
+
+  if (typeof manifest.typings === "string") {
+    return "$.typings";
+  }
+
+  return (
+    collectPackageTargets(manifest).targets.find(
+      (target) => target.source === "exports" && target.kind === "file" && target.conditions.includes("types")
+    )?.jsonPath ?? null
+  );
+}
+
+function resolveTypeScriptCompiler(): string | null {
+  try {
+    return require.resolve("typescript/bin/tsc");
+  } catch {
+    return null;
+  }
 }
 
 function getPackageName(context: ProjectContext): string | null {
@@ -294,6 +457,30 @@ function runtimeUnresolvedFinding(probe: RuntimeResolutionProbe, message: string
   };
 }
 
+function binUnresolvedFinding(entry: BinEntry, message: string): Finding {
+  return {
+    id: "consumer.bin-unresolved",
+    severity: "error",
+    title: "Consumer bin target is not installed correctly",
+    message,
+    suggestion: "Update package bin metadata or files so installed CLI entry points resolve to executable scripts.",
+    file: "package.json",
+    path: entry.jsonPath
+  };
+}
+
+function typesUnresolvedFinding(jsonPath: string, message: string): Finding {
+  return {
+    id: "consumer.types-unresolved",
+    severity: "error",
+    title: "Consumer type resolution failed",
+    message: `TypeScript could not resolve this package from an installed consumer project: ${message}`,
+    suggestion: "Update package type metadata, exports, or files so TypeScript consumers can resolve declarations.",
+    file: "package.json",
+    path: jsonPath
+  };
+}
+
 function commandFailureMessage(error: unknown): string {
   if (!isRecord(error)) {
     return "npm command failed.";
@@ -325,6 +512,10 @@ function firstMeaningfulLine(value: string): string {
 
 function normalizeNpmErrorLine(value: string): string {
   return value.trim().replace(/^npm error\s+/i, "");
+}
+
+function formatJsonPathKey(key: string): string {
+  return /^[A-Za-z_$][\w$]*$/.test(key) ? key : JSON.stringify(key);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

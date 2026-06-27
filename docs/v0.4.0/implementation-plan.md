@@ -295,7 +295,22 @@ npm run typecheck
 
 Status:
 
-- Pending.
+- Completed on 2026-06-27.
+- Extended shared package target metadata with `exportSubpath` so consumer smoke can map explicit package exports to public specifiers without parsing JSON paths.
+- Added runtime resolution probes to `runConsumerSmokeChecks` after the Phase 4 pack/install setup succeeds.
+- Derived probes from package metadata:
+  - no `exports`: probe the bare package name;
+  - explicit `exports`: probe explicit export subpaths;
+  - export patterns: skip runtime probes to avoid false confidence.
+- Added CJS probes with `require.resolve` and ESM probes with `import.meta.resolve` plus a non-executing `file:` URL access check, so missing installed ESM target files are detected without importing modules.
+- Chose probe kind from export conditions and package `"type"`, including `require`, `import`, `default`, and string-target fallback behavior.
+- Added stable findings for `consumer.require-unresolved` and `consumer.import-unresolved` with `file: "package.json"` and target JSON paths when available.
+- Added consumer smoke tests for unresolved require targets, unresolved import targets, valid conditional exports, and skipped export patterns.
+- Added CLI human-output coverage for consumer runtime findings.
+- `npm test -- tests/consumer-smoke.test.ts tests/cli-run.test.ts tests/package-targets.test.ts` passed: 47 tests across 3 test files.
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm test` passed: 232 tests across 18 test files.
 
 ## Phase 6: Bin and Best-Effort Type Smoke
 

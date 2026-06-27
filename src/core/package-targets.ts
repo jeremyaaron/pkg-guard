@@ -10,6 +10,7 @@ export type PackageTarget =
       target: string;
       jsonPath: string;
       conditions: string[];
+      exportSubpath?: string;
     }
   | {
       kind: "pattern";
@@ -17,6 +18,7 @@ export type PackageTarget =
       targetPattern: string;
       jsonPath: string;
       conditions: string[];
+      exportSubpath: string;
     };
 
 export interface PackageTargetCollection {
@@ -88,7 +90,7 @@ function collectExportTargets(targets: PackageTarget[], findings: Finding[], val
     return;
   }
 
-  collectExportValue(targets, findings, value, "$.exports", []);
+  collectExportValue(targets, findings, value, "$.exports", [], ".");
 }
 
 function collectExportValue(
@@ -96,17 +98,18 @@ function collectExportValue(
   findings: Finding[],
   value: unknown,
   jsonPath: string,
-  conditions: string[]
+  conditions: string[],
+  exportSubpath: string
 ): void {
   if (typeof value === "string") {
     if (value.includes("*")) {
       if (isSimplePattern(value)) {
-        targets.push({ kind: "pattern", source: "exports", targetPattern: value, jsonPath, conditions });
+        targets.push({ kind: "pattern", source: "exports", targetPattern: value, jsonPath, conditions, exportSubpath });
       } else {
         findings.push(unsupportedTargetFinding(jsonPath));
       }
     } else {
-      targets.push({ kind: "file", source: "exports", target: value, jsonPath, conditions });
+      targets.push({ kind: "file", source: "exports", target: value, jsonPath, conditions, exportSubpath });
     }
     return;
   }
@@ -118,7 +121,8 @@ function collectExportValue(
         findings,
         nestedValue,
         `${jsonPath}.${formatJsonPathKey(key)}`,
-        isExportSubpathKey(key) ? conditions : [...conditions, key]
+        isExportSubpathKey(key) ? conditions : [...conditions, key],
+        isExportSubpathKey(key) ? key : exportSubpath
       );
     }
     return;

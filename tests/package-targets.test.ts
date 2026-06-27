@@ -76,35 +76,40 @@ describe("collectPackageTargets", () => {
         source: "exports",
         target: "./dist/index.d.ts",
         jsonPath: '$.exports.".".types',
-        conditions: ["types"]
+        conditions: ["types"],
+        exportSubpath: "."
       }),
       expect.objectContaining({
         kind: "file",
         source: "exports",
         target: "./dist/index.js",
         jsonPath: '$.exports.".".import',
-        conditions: ["import"]
+        conditions: ["import"],
+        exportSubpath: "."
       }),
       expect.objectContaining({
         kind: "file",
         source: "exports",
         target: "./dist/index.cjs",
         jsonPath: '$.exports.".".require',
-        conditions: ["require"]
+        conditions: ["require"],
+        exportSubpath: "."
       }),
       expect.objectContaining({
         kind: "file",
         source: "exports",
         target: "./dist/node.js",
         jsonPath: '$.exports.".".node.default',
-        conditions: ["node", "default"]
+        conditions: ["node", "default"],
+        exportSubpath: "."
       }),
       expect.objectContaining({
         kind: "pattern",
         source: "exports",
         targetPattern: "./dist/feature/*.js",
         jsonPath: '$.exports."./feature/*"',
-        conditions: []
+        conditions: [],
+        exportSubpath: "./feature/*"
       })
     ]);
   });
@@ -122,12 +127,14 @@ describe("collectPackageTargets", () => {
       expect.objectContaining({
         target: "./dist/index.js",
         jsonPath: "$.exports.import",
-        conditions: ["import"]
+        conditions: ["import"],
+        exportSubpath: "."
       }),
       expect.objectContaining({
         target: "./dist/index.cjs",
         jsonPath: "$.exports.require",
-        conditions: ["require"]
+        conditions: ["require"],
+        exportSubpath: "."
       })
     ]);
   });

@@ -59,6 +59,18 @@ describe("runCli", () => {
     expect(result.stderr).toBe("");
   });
 
+  it("prints consumer smoke runtime findings in human output", async () => {
+    const fixture = await createPackageFixture({
+      main: "./dist/missing.js"
+    });
+    const result = await invoke(["check", "--consumer-smoke"], fixture);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("consumer.require-unresolved");
+    expect(result.stdout).toContain('require.resolve("fixture") failed');
+  });
+
   it("prints check JSON with schema metadata", async () => {
     const fixture = await createPackageFixture();
     const result = await invoke(["check", "--json"], fixture);
@@ -212,8 +224,11 @@ describe("runCli", () => {
       version: "1.0.0",
       license: "MIT",
       packageManager: "npm@10.8.2",
+      main: "./dist/index.js",
       files: ["dist"]
     });
+    await mkdir(join(fixture, "packages", "a", "dist"), { recursive: true });
+    await writeFile(join(fixture, "packages", "a", "dist", "index.js"), "export {};\n");
     await writeFile(join(fixture, "packages", "a", "README.md"), "# A\n");
     await writeFile(join(fixture, "packages", "a", "LICENSE"), "MIT\n");
     const result = await invoke(["check", "--workspaces"], fixture);
@@ -234,8 +249,11 @@ describe("runCli", () => {
       version: "1.0.0",
       license: "MIT",
       packageManager: "npm@10.8.2",
+      main: "./dist/index.js",
       files: ["dist"]
     });
+    await mkdir(join(fixture, "packages", "a", "dist"), { recursive: true });
+    await writeFile(join(fixture, "packages", "a", "dist", "index.js"), "export {};\n");
     await writeFile(join(fixture, "packages", "a", "README.md"), "# A\n");
     await writeFile(join(fixture, "packages", "a", "LICENSE"), "MIT\n");
     const result = await invoke(["check", "--workspaces", "--consumer-smoke"], fixture);
@@ -494,10 +512,13 @@ async function createPackageFixture(overrides: Record<string, unknown> = {}): Pr
     version: "1.0.0",
     license: "MIT",
     packageManager: "npm@10.8.2",
+    main: "./dist/index.js",
     files: ["dist"],
     ...overrides
   });
   await writeFile(join(root, "package-lock.json"), "{}\n");
+  await mkdir(join(root, "dist"), { recursive: true });
+  await writeFile(join(root, "dist", "index.js"), "export {};\n");
   await writeFile(join(root, "README.md"), "# Fixture\n");
   await writeFile(join(root, "LICENSE"), "MIT\n");
 

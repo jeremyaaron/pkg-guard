@@ -189,7 +189,16 @@ npm run typecheck
 
 Status:
 
-- Pending.
+- Completed on 2026-06-27.
+- Added `src/core/analysis.ts` with `analyzePackage` for single-package checks and `analyzeWorkspacePackage` for workspace package checks.
+- Moved project discovery, workspace context attachment, `runChecks`, package config policy, and CLI ignore/strict policy into the analysis layer.
+- Kept report creation, rendering, and exit-code selection in CLI/reporting code for the single-package path.
+- Updated workspace batch checks to delegate package-level check orchestration to the analysis helper while leaving fix flow behavior in `src/core/batch.ts`.
+- Threaded the placeholder `consumerSmoke` option through single-package and workspace check paths without executing smoke checks yet.
+- Added `tests/analysis.test.ts` coverage for structured single-package and workspace-package analysis findings, package and CLI policy application, and no-context discovery findings.
+- `npm test -- tests/analysis.test.ts tests/cli-run.test.ts tests/batch.test.ts tests/dependencies.test.ts tests/reporters.test.ts` passed: 63 tests across 5 test files.
+- `npm run typecheck` passed.
+- `npm test` passed: 222 tests across 17 test files.
 
 ## Phase 4: Consumer Smoke Skeleton
 

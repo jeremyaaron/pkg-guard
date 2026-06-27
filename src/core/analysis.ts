@@ -1,4 +1,5 @@
 import { runChecks } from "./checks.js";
+import { runConsumerSmokeChecks } from "./consumer-smoke.js";
 import type { ProjectContext } from "./context.js";
 import { discoverProject } from "./discovery.js";
 import type { Finding } from "./findings.js";
@@ -43,36 +44,38 @@ export async function analyzePackage(options: AnalyzeOptions): Promise<PackageAn
     };
   }
 
-  const findings = applyFindingPolicy([...discovery.findings, ...runChecks(discovery.context)], discovery.context.config, {
-    ignore: options.ignore,
-    strict: options.strict
-  });
-
   return {
     cwd: options.cwd,
     root: discovery.context.root,
     context: discovery.context,
-    findings
+    findings: await analyzeContext(discovery.context, discovery.findings, options)
   };
 }
 
 export async function analyzeWorkspacePackage(options: WorkspaceAnalyzeOptions): Promise<WorkspacePackageAnalysis> {
   const discovery = await discoverProject(options.target.root);
   const context = discovery.context ? withWorkspaceContext(discovery.context, options.target, options.workspaceContext) : null;
-  const findings = context
-    ? applyFindingPolicy([...discovery.findings, ...runChecks(context)], context.config, {
-        ignore: options.ignore,
-        strict: options.strict
-      })
-    : discovery.findings;
 
   return {
     cwd: options.target.root,
     root: context?.root ?? options.target.root,
     context,
     target: options.target,
-    findings
+    findings: context ? await analyzeContext(context, discovery.findings, options) : discovery.findings
   };
+}
+
+async function analyzeContext(
+  context: ProjectContext,
+  discoveryFindings: Finding[],
+  options: AnalyzeOptions
+): Promise<Finding[]> {
+  const smokeFindings = options.consumerSmoke ? await runConsumerSmokeChecks(context) : [];
+
+  return applyFindingPolicy([...discoveryFindings, ...runChecks(context), ...smokeFindings], context.config, {
+    ignore: options.ignore,
+    strict: options.strict
+  });
 }
 
 function withWorkspaceContext(

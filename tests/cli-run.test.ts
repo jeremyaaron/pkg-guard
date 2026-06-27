@@ -50,7 +50,7 @@ describe("runCli", () => {
     expect(result.stderr).toBe("");
   });
 
-  it("accepts consumer smoke for check without changing behavior yet", async () => {
+  it("runs consumer smoke for check", async () => {
     const fixture = await createPackageFixture();
     const result = await invoke(["check", "--consumer-smoke"], fixture);
 
@@ -225,7 +225,7 @@ describe("runCli", () => {
     expect(result.stdout).toContain("no issues");
   });
 
-  it("accepts consumer smoke for workspace checks without changing behavior yet", async () => {
+  it("runs consumer smoke for workspace checks", async () => {
     const fixture = await createPackageFixture({
       workspaces: ["packages/*"]
     });

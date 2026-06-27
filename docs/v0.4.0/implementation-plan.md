@@ -241,7 +241,18 @@ npm run typecheck
 
 Status:
 
-- Pending.
+- Completed on 2026-06-27.
+- Added `src/core/consumer-smoke.ts` with `runConsumerSmokeChecks` and the default 30 second per-package timeout.
+- Implemented the Phase 4 smoke skeleton: temporary workspace creation, `npm pack --json --ignore-scripts --pack-destination`, isolated consumer `package.json`, `npm install --ignore-scripts --no-audit --no-fund <tarball>`, and cleanup in a `finally` block.
+- Added stable error findings for `consumer.pack-failed` and `consumer.install-failed`.
+- Wired `--consumer-smoke` through `analyzePackage` and workspace package analysis so smoke findings pass through the same ignore/strict policy as other findings.
+- Left runtime import/require, TypeScript, and bin probes for later phases.
+- Added `tests/consumer-smoke.test.ts` coverage for successful pack/install smoke setup, pack failure mapping, install failure mapping, lifecycle script suppression, and temp directory cleanup.
+- Updated CLI tests to assert the smoke path is accepted for single-package and workspace checks.
+- `npm test -- tests/consumer-smoke.test.ts tests/cli-run.test.ts` passed: 37 tests across 2 test files.
+- `npm run typecheck` passed.
+- `npm test` passed: 227 tests across 18 test files.
+- `npm run lint` passed.
 
 ## Phase 5: Runtime Resolution Smoke
 

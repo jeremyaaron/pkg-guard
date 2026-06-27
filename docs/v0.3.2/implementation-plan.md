@@ -254,7 +254,14 @@ npm run typecheck
 
 Status:
 
-- Pending.
+- Completed on 2026-06-27.
+- Added CLI smoke coverage for pnpm-safe workspace ranges in human workspace output.
+- Added CLI JSON coverage proving `dependencies.workspace-range` remains inside the affected package report rather than root workspace findings.
+- Added CLI SARIF coverage for workspace-range findings, including package-relative artifact URIs and existing SARIF properties.
+- Confirmed no reporter schema changes were needed.
+- `npm test -- tests/cli-run.test.ts tests/reporters.test.ts` passed: 33 tests across 2 test files.
+- `npm run typecheck` passed.
+- `npm test` passed: 207 tests across 15 test files.
 
 ## Phase 6: Documentation and Changelog
 

@@ -196,6 +196,18 @@ describe("runCli", () => {
     expect(result.stdout).toContain("no issues");
   });
 
+  it("does not report pnpm-safe workspace ranges in human workspace output", async () => {
+    const fixture = await createPnpmWorkspaceRangeFixture();
+    const result = await invoke(["check", "--workspaces"], fixture);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("pkg-guard checked 2 packages and skipped 0 packages");
+    expect(result.stdout).toContain("packages/a (@scope/a)");
+    expect(result.stdout).toContain("no issues");
+    expect(result.stdout).not.toContain("dependencies.workspace-range");
+  });
+
   it("returns a failing workspace exit code when any package has an error", async () => {
     const fixture = await createPackageFixture({
       workspaces: ["packages/*"]
@@ -261,6 +273,37 @@ describe("runCli", () => {
     expect(report.findings).toEqual([]);
   });
 
+  it("prints workspace range findings inside package JSON reports", async () => {
+    const fixture = await createPnpmWorkspaceRangeFixture({
+      files: {
+        ".github/workflows/release.yml": "name: release\non: workflow_dispatch\njobs:\n  publish:\n    steps:\n      - run: npm publish\n"
+      }
+    });
+    const result = await invoke(["check", "--workspaces", "--format", "json"], fixture);
+    const report = JSON.parse(result.stdout) as {
+      summary: { errors: number; warnings: number; info: number };
+      findings: unknown[];
+      packages: Array<{
+        relativePath: string;
+        report: {
+          findings: Array<{ id: string; severity: string; file?: string; path?: string }>;
+        };
+      }>;
+    };
+    const packageA = report.packages.find((packageReport) => packageReport.relativePath === "packages/a");
+    const finding = packageA?.report.findings.find((item) => item.id === "dependencies.workspace-range");
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toBe("");
+    expect(report.summary).toEqual({ packages: 2, skipped: 0, errors: 1, warnings: 0, info: 0 });
+    expect(report.findings).toEqual([]);
+    expect(finding).toMatchObject({
+      severity: "error",
+      file: "package.json",
+      path: "$.dependencies.\"@scope/shared\""
+    });
+  });
+
   it("prints workspace SARIF output", async () => {
     const fixture = await createPackageFixture({
       workspaces: ["packages/*"]
@@ -295,6 +338,47 @@ describe("runCli", () => {
           }
         }
       ]
+    });
+  });
+
+  it("prints workspace range findings in SARIF without schema changes", async () => {
+    const fixture = await createPnpmWorkspaceRangeFixture({
+      dependencyName: "@scope/missing"
+    });
+    const result = await invoke(["check", "--workspaces", "--format", "sarif"], fixture);
+    const report = JSON.parse(result.stdout) as {
+      version: string;
+      runs: Array<{
+        tool: { driver: { rules: Array<{ id: string }> } };
+        results: Array<{
+          ruleId: string;
+          level: string;
+          locations?: Array<{ physicalLocation: { artifactLocation: { uri: string } } }>;
+          properties?: { jsonPath?: string; suggestion?: string };
+        }>;
+      }>;
+    };
+    const resultFinding = report.runs[0]?.results.find((item) => item.ruleId === "dependencies.workspace-range");
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toBe("");
+    expect(report.version).toBe("2.1.0");
+    expect(report.runs[0]?.tool.driver.rules.map((rule) => rule.id)).toContain("dependencies.workspace-range");
+    expect(resultFinding).toMatchObject({
+      level: "error",
+      locations: [
+        {
+          physicalLocation: {
+            artifactLocation: {
+              uri: "packages/a/package.json"
+            }
+          }
+        }
+      ],
+      properties: {
+        jsonPath: "$.dependencies.\"@scope/missing\"",
+        suggestion: "Add a matching workspace package or replace the workspace protocol range before publishing."
+      }
     });
   });
 
@@ -365,6 +449,55 @@ async function createPackageFixture(overrides: Record<string, unknown> = {}): Pr
   await writeFile(join(root, "package-lock.json"), "{}\n");
   await writeFile(join(root, "README.md"), "# Fixture\n");
   await writeFile(join(root, "LICENSE"), "MIT\n");
+
+  return root;
+}
+
+async function createPnpmWorkspaceRangeFixture(
+  options: {
+    dependencyName?: string;
+    files?: Record<string, string>;
+  } = {}
+): Promise<string> {
+  const dependencyName = options.dependencyName ?? "@scope/shared";
+  const root = await createPackageFixture({
+    packageManager: "pnpm@9.0.0",
+    workspaces: ["packages/*"]
+  });
+
+  await writePackageJson(join(root, "packages", "a", "package.json"), {
+    name: "@scope/a",
+    version: "1.0.0",
+    license: "MIT",
+    packageManager: "pnpm@9.0.0",
+    publishConfig: {
+      access: "public"
+    },
+    files: ["dist"],
+    dependencies: {
+      [dependencyName]: "workspace:*"
+    }
+  });
+  await writePackageJson(join(root, "packages", "shared", "package.json"), {
+    name: "@scope/shared",
+    version: "1.0.0",
+    license: "MIT",
+    packageManager: "pnpm@9.0.0",
+    publishConfig: {
+      access: "public"
+    },
+    files: ["dist"]
+  });
+  await writeFile(join(root, "packages", "a", "README.md"), "# A\n");
+  await writeFile(join(root, "packages", "a", "LICENSE"), "MIT\n");
+  await writeFile(join(root, "packages", "shared", "README.md"), "# Shared\n");
+  await writeFile(join(root, "packages", "shared", "LICENSE"), "MIT\n");
+
+  for (const [relativePath, content] of Object.entries(options.files ?? {})) {
+    const filePath = join(root, relativePath);
+    await mkdir(join(filePath, ".."), { recursive: true });
+    await writeFile(filePath, content);
+  }
 
   return root;
 }

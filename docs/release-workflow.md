@@ -61,3 +61,5 @@ The publish step always uses the npm CLI because npm trusted publishing is tied 
 | `publishConfig.access: "restricted"` | `npm publish --access restricted` |
 
 Workflow checks also compare obvious publish access flags with `publishConfig.access` and warn when scoped packages publish without explicit access.
+
+For pnpm workspaces that use `workspace:` dependency ranges, review this carefully: the generated workflow still publishes with `npm publish`, so pnpm workspace protocol ranges are not rewritten by the publish command. Use a pnpm publish path for packages that intentionally publish `workspace:` ranges, or replace those ranges before npm publishing.

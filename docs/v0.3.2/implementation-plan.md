@@ -288,7 +288,12 @@ npm run lint
 
 Status:
 
-- Pending.
+- Completed on 2026-06-27.
+- Added a `0.3.2` changelog entry mapped to issue #11 and the refined `dependencies.workspace-range` behavior.
+- Updated `docs/checks.md` to explain when pnpm workspace protocol ranges are safe, and why missing targets, private targets, non-pnpm roots, unknown paths, and npm publish paths remain findings.
+- Added a pnpm workspace dependency example to `docs/examples.md` showing `pkg-guard check --workspaces`.
+- Updated `docs/release-workflow.md` to clarify that generated workflows still publish with `npm publish`, which does not rewrite pnpm `workspace:` ranges.
+- `npm run lint` passed.
 
 ## Phase 7: Final Verification and Release Prep
 

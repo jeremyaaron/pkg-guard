@@ -111,3 +111,7 @@ Workflow validation recognizes direct GitHub Actions `run:` commands and validat
 | `dependencies.runtime-in-dev` | warning | Known runtime libraries declared only in `devDependencies` may break consumers. |
 | `dependencies.optional-peer-metadata-missing` | warning | Optional peers should be marked in `peerDependenciesMeta`. |
 | `dependencies.range-too-broad` | warning | Broad dependency ranges are risky for published libraries. |
+
+`dependencies.workspace-range` is conservative in single-package checks because `pkg-guard` cannot prove that a package is being published through a workspace-aware tool. In workspace mode, pnpm roots are handled more precisely: a `workspace:` range is allowed when it resolves to a named, publishable local workspace package and no root or package-local workflow obviously publishes with `npm publish` or `npx semantic-release`.
+
+The finding remains an error when the dependency name does not match a workspace package, when the workspace root is not pnpm, when the publish path is unknown, or when an npm publish workflow is detected. npm publishing does not rewrite pnpm workspace protocol ranges. Public packages that depend on private workspace packages are also flagged; private targets in `devDependencies` are warnings because they are not published consumer dependency metadata.

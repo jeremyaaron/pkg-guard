@@ -92,6 +92,19 @@ npx pkg-guard check --workspace @scope/pkg
 npx pkg-guard check --workspace packages/pkg
 ```
 
+## pnpm Workspace Dependencies
+
+pnpm rewrites `workspace:` dependency ranges during `pnpm pack` and `pnpm publish` when the range points to a local workspace package. Use workspace mode from the root so `pkg-guard` can inspect the workspace graph before deciding whether `dependencies.workspace-range` is publish-safe:
+
+```yaml
+- run: corepack enable
+- run: pnpm install --frozen-lockfile
+- run: pnpm run build --if-present
+- run: npx pkg-guard check --workspaces
+```
+
+This suppresses `dependencies.workspace-range` only for publishable local workspace targets in a pnpm root when no obvious npm publish workflow is present. The finding still appears if the target package is missing, the target is private and would appear in published dependency metadata, or a root or package-local workflow publishes with `npm publish` or `npx semantic-release`.
+
 ## SARIF in CI
 
 `--format sarif` is available for `check` in both single-package and workspace modes:

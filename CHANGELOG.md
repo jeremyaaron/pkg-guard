@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.2
+
+- Refines `dependencies.workspace-range` for issue #11 so pnpm workspace dependencies on publishable local workspace packages no longer fail when `pkg-guard check --workspaces` can prove pnpm will rewrite them during publish.
+- Keeps `dependencies.workspace-range` release-blocking for unsafe workspace protocol ranges, including missing workspace targets, non-pnpm roots, unknown or npm publish paths, and public packages that depend on private workspace packages in published dependency metadata.
+- Adds workspace publish-path inference from root and package-local GitHub Actions workflows, treating obvious `npm publish` and `npx semantic-release` commands as npm publish paths even in pnpm-managed workspaces.
+
 ## 0.3.1
 
 - Fixes `typescript.types-source-file` so generated declaration targets such as `./dist/index.d.ts`, `.d.cts`, and `.d.mts` are not treated as TypeScript source files.
